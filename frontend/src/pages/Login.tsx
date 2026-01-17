@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, User, Lock, ArrowRight } from "lucide-react";
+import { ArrowLeft, User, Lock, ArrowRight, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -13,22 +13,20 @@ export default function Login() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
 
-    const roleTitle = roleId === 'kitchen' ? 'Kitchen Display' : roleId === 'admin' ? 'Administration' : 'Login';
+    const roleTitle = roleId === 'admin' ? 'Administration' : 'Management';
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
 
         // Static credentials check
-        const valid = (roleId === 'kitchen' && username === 'kitchen' && password === 'kitchen') ||
-            (roleId === 'admin' && username === 'admin' && password === 'admin');
+        const valid = (username === 'admin' && password === 'admin');
 
         if (valid) {
             toast.success("Login Successful", {
                 description: `Welcome to ${roleTitle}`,
             });
-            // Navigate to the respective dashboard
-            navigate(roleId === 'kitchen' ? '/kitchen' : '/admin');
+            navigate('/admin/dashboard');
         } else {
             setError("Invalid credentials. Please try again.");
             toast.error("Login Failed", {
@@ -38,57 +36,59 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-stone-50/50 relative overflow-hidden transition-colors duration-500">
-            {/* Background Decoration */}
-            <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-white to-transparent opacity-60 -z-10" />
-
-            <div className="w-full max-w-md animate-in fade-in zoom-in duration-500">
-
-                {/* Header */}
-                <div className="text-center mb-8">
-                    <div className="relative inline-block mb-6">
-                        <img
-                            src="/logos/logo2brown.jpeg"
-                            alt="Ama Bakery Logo"
-                            className="h-20 w-20 rounded-[1.5rem] object-cover border-4 border-white shadow-lg mx-auto"
-                        />
-                    </div>
-                    <h1 className="text-2xl font-bold tracking-tight mb-2 text-stone-800">
-                        {roleTitle} Login
-                    </h1>
-                    <p className="text-stone-400 text-sm">
-                        Please enter your credentials to continue
-                    </p>
+        <div className="min-h-screen gradient-cream flex flex-col items-center justify-center p-6 overflow-hidden">
+            {/* Header / Branding */}
+            <div className="text-center mb-6 animate-in fade-in zoom-in duration-700">
+                <div className="inline-flex items-center justify-center h-16 w-16 md:h-20 md:w-20 rounded-3xl bg-white shadow-warm mb-4 p-1 overflow-hidden border-2 border-primary/10">
+                    <img src="/logos/logo1white.jfif" alt="Ama Bakery Logo" className="h-full w-full object-cover" />
                 </div>
+                <h1 className="text-2xl md:text-4xl font-rockwell tracking-tight text-slate-800 mb-1">Ama Bakery</h1>
+                <p className="text-primary/60 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] mt-0.5 bg-primary/5 px-4 py-1 rounded-full inline-block border border-primary/10">Secure Admin Gateway</p>
+            </div>
 
-                {/* Login Form */}
-                <div className="bg-white rounded-[2rem] shadow-xl shadow-stone-200/50 p-8 border border-stone-100">
-                    <form onSubmit={handleLogin} className="space-y-6">
+            {/* Login Card */}
+            <div className="w-full max-w-sm animate-slide-up">
+                <div className="card-elevated p-8 md:p-10 border-4 border-white flex flex-col shadow-2xl shadow-primary/5 rounded-[2.5rem]">
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                            <ShieldCheck className="h-5 w-5" />
+                        </div>
+                        <div className="text-left">
+                            <h2 className="font-black text-slate-800 text-lg leading-none">Admin Sign-in</h2>
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Authorized Access Only</p>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleLogin} className="space-y-5">
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase tracking-wider text-stone-500 ml-1">Username</label>
-                                <div className="relative">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-stone-400" />
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Username</label>
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
+                                        <User className="h-4 w-4" />
+                                    </div>
                                     <Input
                                         type="text"
                                         value={username}
                                         onChange={(e) => setUsername(e.target.value)}
-                                        className="pl-12 h-12 bg-stone-50 border-stone-200 rounded-xl focus:ring-2 focus:ring-stone-200 focus:border-stone-400 transition-all font-medium text-stone-700"
-                                        placeholder="Enter username"
+                                        className="pl-11 h-13 bg-slate-50 border-2 border-slate-100 rounded-2xl focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-primary transition-all font-bold text-slate-700 placeholder:text-slate-300"
+                                        placeholder="Username"
                                         autoFocus
                                     />
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase tracking-wider text-stone-500 ml-1">Password</label>
-                                <div className="relative">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-stone-400" />
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Password</label>
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
+                                        <Lock className="h-4 w-4" />
+                                    </div>
                                     <Input
                                         type="password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="pl-12 h-12 bg-stone-50 border-stone-200 rounded-xl focus:ring-2 focus:ring-stone-200 focus:border-stone-400 transition-all font-medium text-stone-700 font-mono"
+                                        className="pl-11 h-13 bg-slate-50 border-2 border-slate-100 rounded-2xl focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-primary transition-all font-bold text-slate-700 font-mono placeholder:text-slate-300"
                                         placeholder="••••••••"
                                     />
                                 </div>
@@ -96,35 +96,36 @@ export default function Login() {
                         </div>
 
                         {error && (
-                            <div className="bg-red-50 text-red-600 text-sm font-medium px-4 py-3 rounded-xl flex items-center gap-2 animate-in slide-in-from-top-2">
-                                <span className="h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
+                            <div className="bg-destructive/5 text-destructive text-[10px] font-black uppercase tracking-widest px-4 py-3 rounded-xl border border-destructive/10 animate-in slide-in-from-top-2 text-center">
                                 {error}
                             </div>
                         )}
 
                         <Button
                             type="submit"
-                            className="w-full h-12 rounded-xl text-base font-bold shadow-lg shadow-stone-200 hover:shadow-xl transition-all hover:-translate-y-0.5 bg-stone-800 hover:bg-stone-900 text-white"
+                            className="w-full h-14 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:shadow-2xl transition-all hover:scale-[1.02] active:scale-95 gradient-warm text-white"
                         >
-                            Sign In
-                            <ArrowRight className="h-5 w-5 ml-2 opacity-80" />
+                            Log In Securely
+                            <ArrowRight className="h-4 w-4 ml-2" />
                         </Button>
                     </form>
-                </div>
 
-                {/* Footer Action */}
-                <div className="mt-8 text-center">
-                    <Button
-                        variant="ghost"
-                        onClick={() => navigate('/')}
-                        className="text-stone-400 hover:text-stone-600 hover:bg-transparent -ml-2"
-                    >
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Back to Selection
-                    </Button>
+                    <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-2 opacity-60 w-full text-slate-400">
+                        <Lock className="h-3 w-3" />
+                        <span className="text-[8px] font-black uppercase tracking-[0.2em]">Encrypted Terminal Session</span>
+                    </div>
                 </div>
-
             </div>
+
+            {/* Back Button */}
+            <Button
+                variant="ghost"
+                onClick={() => navigate('/')}
+                className="mt-8 font-black text-[10px] uppercase tracking-widest text-slate-500 hover:text-primary transition-all hover:bg-white/50 rounded-full px-8 py-4"
+            >
+                <ArrowLeft className="h-3 w-3 mr-2" />
+                Back to Role Selection
+            </Button>
         </div>
     );
 }

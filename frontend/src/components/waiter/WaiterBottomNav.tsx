@@ -37,7 +37,7 @@ export function WaiterBottomNav() {
                             key={item.path}
                             onClick={() => navigate(item.path)}
                             className={cn(
-                                "flex-1 flex flex-col items-center gap-1 py-3 transition-all",
+                                "relative flex-1 flex flex-col items-center gap-1 py-3 transition-all",
                                 item.active
                                     ? "text-primary"
                                     : "text-muted-foreground hover:text-foreground"

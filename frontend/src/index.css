@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Rockwell';
+  src: url('/fonts/Rockwell-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
 @layer base {
   :root {
     /* New Gold Theme (#d19d2a) */
@@ -165,6 +172,10 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  .font-rockwell {
+    font-family: 'Rockwell', serif;
   }
 
   .animate-pulse-soft {
