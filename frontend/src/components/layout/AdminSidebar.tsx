@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
   { icon: ClipboardList, label: "Orders", path: "/admin/orders" },
   { icon: UtensilsCrossed, label: "Menu", path: "/admin/menu" },
   { icon: Package, label: "Inventory", path: "/admin/inventory" },

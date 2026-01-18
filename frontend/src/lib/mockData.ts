@@ -166,7 +166,7 @@ export const sampleOrders: Order[] = [
 export const users: User[] = [
   { id: 'u1', name: 'Rahul', role: 'waiter', pin: '1234' },
   { id: 'u2', name: 'Priya', role: 'waiter', pin: '2345' },
-  { id: 'u3', name: 'Kitchen1', role: 'kitchen', pin: '3456' },
+  { id: 'u3', name: 'Kitchen1', role: 'kitchen', pin: '1111' },
   { id: 'u4', name: 'Admin', role: 'admin', pin: '0000' },
   { id: 'u5', name: 'Counter', role: 'counter', pin: '1111' },
 ];

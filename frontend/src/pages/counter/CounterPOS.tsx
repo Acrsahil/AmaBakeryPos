@@ -24,7 +24,8 @@ import {
     Cookie,
     Pizza,
     Sandwich,
-    Soup
+    Soup,
+    Pencil
 } from "lucide-react";
 import { menuItems, MenuItem, User as UserType } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,9 @@ export default function CounterPOS() {
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showReceipt, setShowReceipt] = useState(false);
+    const [showQtyDialog, setShowQtyDialog] = useState(false);
+    const [qtyEditItem, setQtyEditItem] = useState<CartItemData | null>(null);
+    const [qtyInput, setQtyInput] = useState("");
 
     useEffect(() => {
         const user = localStorage.getItem('currentUser');
@@ -69,6 +73,25 @@ export default function CounterPOS() {
             navigate('/counter');
         }
     }, [navigate]);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!showQtyDialog) return;
+
+            if (/^[0-9]$/.test(e.key)) {
+                setQtyInput(prev => (prev.length < 3 ? prev + e.key : prev));
+            } else if (e.key === "Backspace") {
+                setQtyInput(prev => prev.slice(0, -1));
+            } else if (e.key === "Enter") {
+                handleQtySubmit();
+            } else if (e.key === "Escape") {
+                setShowQtyDialog(false);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [showQtyDialog, qtyInput, qtyEditItem]);
 
     const categories = useMemo(() =>
         ["All", ...new Set(menuItems.map(item => item.category))],
@@ -116,6 +139,30 @@ export default function CounterPOS() {
             }
             return c;
         }).filter(c => c.quantity > 0));
+    };
+
+    const setQuantity = (itemId: string, amount: number) => {
+        setCart(prev => prev.map(c => {
+            if (c.item.id === itemId) {
+                return { ...c, quantity: Math.max(0, amount) };
+            }
+            return c;
+        }).filter(c => c.quantity > 0));
+    };
+
+    const handleQtyEditOpen = (item: CartItemData) => {
+        setQtyEditItem(item);
+        setQtyInput("");
+        setShowQtyDialog(true);
+    };
+
+    const handleQtySubmit = () => {
+        if (qtyEditItem && qtyInput) {
+            setQuantity(qtyEditItem.item.id, parseInt(qtyInput));
+        }
+        setShowQtyDialog(false);
+        setQtyEditItem(null);
+        setQtyInput("");
     };
 
     const deleteFromCart = (itemId: string) => {
@@ -234,25 +281,28 @@ export default function CounterPOS() {
                                 <button
                                     key={item.id}
                                     onClick={() => addToCart(item)}
-                                    className="group flex flex-col bg-white rounded-[2rem] p-4 text-left border-2 border-transparent hover:border-primary transition-all hover:shadow-xl hover:shadow-primary/5 active:scale-95"
+                                    className="group flex flex-col justify-between bg-white rounded-[1.5rem] p-5 text-left border-2 border-transparent hover:border-primary transition-all hover:shadow-xl hover:shadow-primary/5 active:scale-95 min-h-[140px]"
                                 >
-                                    <div className="w-full aspect-[4/3] bg-amber-50 rounded-[1.5rem] mb-4 flex items-center justify-center overflow-hidden border border-amber-100/50">
-                                        {item.image ? (
-                                            <img src={item.image} alt={item.name} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                        ) : (() => {
-                                            const Icons = [Cake, Coffee, Cookie, Pizza, Sandwich, Soup];
-                                            const Icon = Icons[item.id.length % Icons.length];
-                                            return <Icon className="h-12 w-12 text-primary/30 group-hover:scale-110 transition-transform duration-500" />;
-                                        })()}
-                                    </div>
                                     <div className="flex-1">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">{item.category}</p>
-                                        <h3 className="font-bold text-slate-800 text-sm line-clamp-2 leading-snug">{item.name}</h3>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="h-6 w-6 rounded-lg bg-primary/5 flex items-center justify-center">
+                                                {(() => {
+                                                    const Icons = [Cake, Coffee, Cookie, Pizza, Sandwich, Soup];
+                                                    const Icon = Icons[item.id.length % Icons.length];
+                                                    return <Icon className="h-3.5 w-3.5 text-primary/40" />;
+                                                })()}
+                                            </div>
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-primary/60">{item.category}</p>
+                                        </div>
+                                        <h3 className="font-bold text-slate-800 text-sm md:text-base line-clamp-2 leading-tight group-hover:text-primary transition-colors">{item.name}</h3>
                                     </div>
-                                    <div className="mt-4 flex items-center justify-between">
-                                        <span className="text-lg font-black text-slate-900">₹{item.price}</span>
-                                        <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-                                            <Plus className="h-4 w-4" />
+                                    <div className="mt-4 flex items-end justify-between">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Price</span>
+                                            <span className="text-xl font-black text-slate-900 leading-none">₹{item.price}</span>
+                                        </div>
+                                        <div className="h-10 w-10 rounded-2xl bg-slate-50 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all group-hover:rotate-6 group-hover:scale-110">
+                                            <Plus className="h-5 w-5" />
                                         </div>
                                     </div>
                                 </button>
@@ -300,19 +350,30 @@ export default function CounterPOS() {
                                         <span className="font-black text-slate-900">₹{(cartItem.item.price * cartItem.quantity).toFixed(2)}</span>
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center bg-white rounded-lg border border-slate-200 overflow-hidden">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center bg-white rounded-lg border border-slate-200 overflow-hidden h-8">
+                                                <button
+                                                    onClick={() => updateQuantity(cartItem.item.id, -1)}
+                                                    className="p-1 px-2 hover:bg-slate-50 text-slate-500"
+                                                >
+                                                    <Minus className="h-3 w-3" />
+                                                </button>
+                                                <span className="w-8 text-center text-xs font-black text-slate-700">
+                                                    {cartItem.quantity}
+                                                </span>
+                                                <button
+                                                    onClick={() => updateQuantity(cartItem.item.id, 1)}
+                                                    className="p-1 px-2 hover:bg-slate-50 text-slate-500"
+                                                >
+                                                    <Plus className="h-3 w-3" />
+                                                </button>
+                                            </div>
                                             <button
-                                                onClick={() => updateQuantity(cartItem.item.id, -1)}
-                                                className="p-1 px-2 hover:bg-slate-50 text-slate-500"
+                                                onClick={() => handleQtyEditOpen(cartItem)}
+                                                className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all active:scale-90"
+                                                title="Edit quantity"
                                             >
-                                                <Minus className="h-3 w-3" />
-                                            </button>
-                                            <span className="w-8 text-center text-xs font-black text-slate-700">{cartItem.quantity}</span>
-                                            <button
-                                                onClick={() => updateQuantity(cartItem.item.id, 1)}
-                                                className="p-1 px-2 hover:bg-slate-50 text-slate-500"
-                                            >
-                                                <Plus className="h-3 w-3" />
+                                                <Pencil className="h-3.5 w-3.5" />
                                             </button>
                                         </div>
                                         <button
@@ -589,6 +650,58 @@ export default function CounterPOS() {
                                 Print
                             </Button>
                         </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Quantity Edit Dialog */}
+            <Dialog open={showQtyDialog} onOpenChange={setShowQtyDialog}>
+                <DialogContent className="max-w-[320px] p-6 rounded-[2rem] border-none shadow-3xl">
+                    <div className="text-center space-y-4">
+                        <div className="space-y-1">
+                            <h3 className="text-lg font-black text-slate-800 line-clamp-1">{qtyEditItem?.item.name}</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Enter Quantity</p>
+                        </div>
+
+                        <div className="bg-slate-50 p-4 rounded-2xl border-2 border-primary/20">
+                            <span className="text-4xl font-black text-primary">
+                                {qtyInput || cart.find(c => c.item.id === qtyEditItem?.item.id)?.quantity || "0"}
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, "C", 0, "OK"].map((key) => (
+                                <Button
+                                    key={key.toString()}
+                                    variant={key === "OK" ? "default" : "secondary"}
+                                    className={cn(
+                                        "h-12 text-lg font-black rounded-xl transition-all active:scale-90",
+                                        key === "OK" ? "gradient-warm col-span-1" : "bg-white border hover:bg-slate-50 shadow-sm",
+                                        key === "C" ? "text-destructive" : ""
+                                    )}
+                                    onClick={() => {
+                                        if (key === "OK") handleQtySubmit();
+                                        else if (key === "C") setQtyInput("");
+                                        else setQtyInput(prev => (prev.length < 3 ? prev + key : prev));
+                                    }}
+                                >
+                                    {key}
+                                </Button>
+                            ))}
+                        </div>
+
+                        <div className="pt-2 flex items-center justify-center gap-2 opacity-40">
+                            <Monitor className="h-3 w-3 text-slate-400" />
+                            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-400">Keyboard Numpad Enabled</span>
+                        </div>
+
+                        <Button
+                            variant="ghost"
+                            className="w-full text-xs font-bold text-slate-400 mt-2"
+                            onClick={() => setShowQtyDialog(false)}
+                        >
+                            Cancel
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>

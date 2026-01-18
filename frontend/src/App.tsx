@@ -23,6 +23,7 @@ import CounterPOS from "./pages/counter/CounterPOS";
 import CounterOrders from "./pages/counter/CounterOrders";
 
 // Kitchen Pages
+import KitchenLogin from "./pages/kitchen/KitchenLogin";
 import KitchenDisplay from "./pages/kitchen/KitchenDisplay";
 
 // Admin Pages & Layout
@@ -62,10 +63,12 @@ const App = () => (
           <Route path="/counter/orders" element={<CounterOrders />} />
 
           {/* Kitchen Routes */}
-          <Route path="/kitchen" element={<KitchenDisplay />} />
+          <Route path="/kitchen" element={<KitchenLogin />} />
+          <Route path="/kitchen/display" element={<KitchenDisplay />} />
 
           {/* Admin Routes */}
-          <Route path="/admin" element={<AdminLayout />}>
+          <Route path="/admin" element={<Login />} />
+          <Route path="/admin/dashboard" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="menu" element={<AdminMenu />} />

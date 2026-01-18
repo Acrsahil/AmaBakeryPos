@@ -47,36 +47,35 @@ export default function RoleSelection() {
       <div className="w-full max-w-7xl flex flex-col items-center z-10 py-12 md:py-0">
 
         {/* Brand Section */}
-        <div className="text-center mb-12 md:mb-16 animate-in fade-in zoom-in duration-700">
-          <div className="relative inline-block group cursor-pointer mb-8">
-            <div className="absolute inset-0 bg-primary/20 blur-3xl opacity-20 group-hover:opacity-40 transition-opacity duration-500 rounded-full" />
+        <div className="text-center mb-8 md:mb-10 animate-in fade-in zoom-in duration-700">
+          <div className="relative inline-block group cursor-pointer mb-6">
             <img
               src="/logos/logo1white.jfif"
               alt="Ama Bakery Logo"
-              className="relative h-28 w-28 md:h-32 md:w-32 rounded-[2.5rem] mb-6 object-cover border-4 border-white shadow-2xl transform transition-all duration-500 group-hover:scale-105 group-hover:rotate-2"
+              className="relative h-24 w-24 md:h-28 md:w-28 rounded-[2rem] mb-4 object-cover border-4 border-white transform transition-all duration-500 group-hover:scale-105 group-hover:rotate-2"
             />
           </div>
-          <h1 className="text-4xl md:text-6xl font-black text-slate-800 tracking-tight mb-4">
+          <h1 className="text-3xl md:text-5xl font-rockwell text-slate-800 tracking-tight mb-3">
             Ama Bakery
           </h1>
-          <p className="text-base md:text-xl text-primary/60 font-black uppercase tracking-[0.3em] bg-primary/5 px-6 py-2 rounded-full inline-block">
+          <p className="text-sm md:text-lg text-primary/60 font-black uppercase tracking-[0.3em] bg-primary/5 px-6 py-1.5 rounded-full inline-block">
             Management Suite
           </p>
         </div>
 
         {/* Roles Grid - 4 in 1 row on desktop */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full animate-in slide-in-from-bottom-8 duration-700 delay-150">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 w-full animate-in slide-in-from-bottom-8 duration-700 delay-150">
           {roles.map((role) => (
             <button
               key={role.id}
               onClick={() => navigate(role.path)}
-              className="group relative flex flex-col items-center p-8 md:p-10 bg-white rounded-[3rem] shadow-sm hover:shadow-2xl hover:shadow-primary/10 border-4 border-white hover:border-primary/20 transition-all duration-300 hover:-translate-y-2 active:scale-95"
+              className="group relative flex flex-col items-center p-6 md:p-8 bg-white rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:shadow-primary/10 border-4 border-white hover:border-primary/20 transition-all duration-300 hover:-translate-y-2 active:scale-95"
             >
-              <div className={`h-20 w-20 md:h-24 md:w-24 rounded-[2rem] ${role.color} flex items-center justify-center mb-6 md:mb-8 transition-all duration-500 group-hover:scale-110 group-hover:rotate-6 group-hover:shadow-lg group-hover:shadow-current/20`}>
-                <role.icon className="h-10 w-10 md:h-12 md:w-12" strokeWidth={1.5} />
+              <div className={`h-16 w-16 md:h-20 md:w-20 rounded-[1.5rem] ${role.color} flex items-center justify-center mb-5 md:mb-6 transition-all duration-500 group-hover:scale-110 group-hover:rotate-6 group-hover:shadow-lg group-hover:shadow-current/20`}>
+                <role.icon className="h-8 w-8 md:h-10 md:w-10" strokeWidth={1.5} />
               </div>
 
-              <h3 className="text-xl md:text-2xl font-black text-slate-800 mb-3 group-hover:text-primary transition-colors">
+              <h3 className="text-lg md:text-xl font-black text-slate-800 mb-3 group-hover:text-primary transition-colors">
                 {role.title}
               </h3>
 

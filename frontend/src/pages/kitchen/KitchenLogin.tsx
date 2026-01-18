@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock, Monitor, Delete } from "lucide-react";
+import { Lock, ChefHat, Monitor, Delete } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { users } from "@/lib/mockData";
 import { toast } from "sonner";
 
-export default function CounterLogin() {
+export default function KitchenLogin() {
     const navigate = useNavigate();
     const [pin, setPin] = useState("");
     const [error, setError] = useState("");
 
-    // Find default counter user
-    const counterUser = users.find(u => u.role === 'counter') || users[0];
+    // Find default kitchen user
+    const kitchenUser = users.find(u => u.role === 'kitchen') || users[0];
 
     // Keyboard support
     useEffect(() => {
@@ -34,12 +34,12 @@ export default function CounterLogin() {
             setError("");
 
             if (newPin.length === 4) {
-                if (counterUser.pin === newPin) {
-                    localStorage.setItem('currentUser', JSON.stringify(counterUser));
+                if (kitchenUser.pin === newPin) {
+                    localStorage.setItem('currentUser', JSON.stringify(kitchenUser));
                     toast.success("Login successful!", {
-                        description: `Welcome to the Counter Terminal`,
+                        description: `Welcome to the Kitchen Display System`,
                     });
-                    navigate('/counter/pos');
+                    navigate('/kitchen/display');
                 } else {
                     setError("Invalid PIN. Please try again.");
                     setTimeout(() => setPin(""), 500);
@@ -61,19 +61,19 @@ export default function CounterLogin() {
                     <img src="/logos/logo1white.jfif" alt="Ama Bakery Logo" className="h-full w-full object-cover" />
                 </div>
                 <h1 className="text-2xl md:text-3xl font-rockwell tracking-tight text-slate-800 mb-1">Ama Bakery</h1>
-                <p className="text-primary/60 text-[10px] font-black uppercase tracking-[0.3em] mt-0.5 bg-primary/5 px-3 py-0.5 rounded-full inline-block">Counter Terminal</p>
+                <p className="text-orange-500 text-[10px] font-black uppercase tracking-[0.3em] mt-0.5 bg-orange-50 px-3 py-0.5 rounded-full inline-block border border-orange-100">Kitchen Terminal</p>
             </div>
 
             {/* PIN Entry Card */}
             <div className="w-full max-w-sm animate-slide-up">
-                <div className="card-elevated p-6 md:p-8 border-4 border-white flex flex-col items-center shadow-2xl shadow-primary/5">
+                <div className="card-elevated p-6 md:p-8 border-4 border-white flex flex-col items-center shadow-2xl shadow-orange-900/5">
                     <div className="flex items-center justify-center gap-2 mb-6">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Lock className="h-4 w-4 text-primary" />
+                        <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                            <ChefHat className="h-4 w-4" />
                         </div>
                         <div className="text-left">
-                            <h2 className="font-black text-slate-800 text-sm leading-none">Security Pin</h2>
-                            <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-0.5">Enter code to unlock</p>
+                            <h2 className="font-black text-slate-800 text-sm leading-none">Kitchen Access</h2>
+                            <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-0.5">Enter PIN to Unlock</p>
                         </div>
                     </div>
 
@@ -83,7 +83,7 @@ export default function CounterLogin() {
                             <div
                                 key={i}
                                 className={`h-4 w-4 rounded-full border-2 transition-all duration-300 ${i < pin.length
-                                    ? error ? 'bg-destructive border-destructive scale-110 shadow-lg shadow-destructive/20' : 'bg-primary border-primary scale-110 shadow-lg shadow-primary/20'
+                                    ? error ? 'bg-destructive border-destructive scale-110 shadow-lg shadow-destructive/20' : 'bg-orange-500 border-orange-500 scale-110 shadow-lg shadow-orange-500/20'
                                     : 'bg-white border-slate-200'
                                     }`}
                             />
@@ -106,7 +106,7 @@ export default function CounterLogin() {
                                     ? 'bg-white border-2 hover:bg-slate-50'
                                     : item === null
                                         ? 'bg-transparent opacity-0 cursor-default pointer-events-none'
-                                        : 'bg-slate-50/50 hover:bg-white hover:shadow-xl hover:shadow-primary/10 border-2 border-transparent hover:border-primary/10'
+                                        : 'bg-slate-50/50 hover:bg-white hover:text-orange-600 hover:shadow-xl border-2 border-transparent hover:border-orange-100'
                                     }`}
                                 onClick={() => {
                                     if (item === 'del') {
@@ -124,7 +124,7 @@ export default function CounterLogin() {
                     {/* Keyboard Hint */}
                     <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-2 opacity-40 w-full">
                         <Monitor className="h-3 w-3 text-slate-400" />
-                        <span className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-400">Physical Numpad Active</span>
+                        <span className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-400">Physical Numpad Enabled</span>
                     </div>
                 </div>
             </div>
@@ -132,7 +132,7 @@ export default function CounterLogin() {
             {/* Back Button */}
             <Button
                 variant="ghost"
-                className="mt-6 font-black text-[9px] uppercase tracking-widest text-slate-400 hover:text-primary transition-all hover:bg-white/50 rounded-full px-6 py-2"
+                className="mt-6 font-black text-[9px] uppercase tracking-widest text-slate-400 hover:text-orange-500 transition-all hover:bg-white/50 rounded-full px-6 py-2"
                 onClick={() => navigate('/')}
             >
                 ← Exit System
