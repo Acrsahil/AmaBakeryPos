@@ -36,10 +36,13 @@ class User(AbstractUser):
         blank=True,
         related_name="branch_user",
     )
+
+    # UPDATED: Added the roles you need
     USER_TYPE_CHOICES = [
-        ("ADMIN", "Admin"),
-        ("WAITER", "Waiter"),
-        ("KITCHEN_STAFF", "Kitchen_Staff"),
+        ("BRANCH_MANAGER", "Branch Manager"),  # Manages one branch
+        ("WAITER", "Waiter"),  # Table service
+        ("COUNTER", "Counter"),  # Cashier
+        ("KITCHEN", "Kitchen"),  # Kitchen staff
     ]
     full_name = models.CharField(max_length=20, blank=True)
     user_type = models.CharField(
