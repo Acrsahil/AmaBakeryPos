@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // Pages
 import Login from "./pages/Login";
@@ -32,6 +32,8 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminCustomers from "./pages/admin/AdminCustomers";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminSettings from "./pages/admin/AdminSettings";
+
+// Super Admin
 import SuperAdminLogin from "./pages/SuperAdminLogin";
 import { SuperAdminLayout } from "./components/layout/SuperAdminLayout";
 import SuperAdminOverview from "./pages/superadmin/SuperAdminOverview";
@@ -42,6 +44,62 @@ import SuperAdminSettings from "./pages/superadmin/SuperAdminSettings";
 
 const queryClient = new QueryClient();
 
+// --------- AUTH HELPERS (frontend only) ----------
+const isLoggedIn = () => !!localStorage.getItem("access");
+
+const getCurrentUser = () => {
+  try {
+    const u = localStorage.getItem("currentUser");
+    return u ? JSON.parse(u) : null;
+  } catch {
+    return null;
+  }
+};
+
+const roleRedirectPath = (role?: string) => {
+  switch (role) {
+    case "superadmin":
+      return "/super-admin/dashboard";
+    case "admin":
+      return "/admin/dashboard";
+    case "waiter":
+      return "/waiter/tables";
+    case "counter":
+      return "/counter/pos";
+    case "kitchen":
+      return "/kitchen/display";
+    default:
+      return "/login";
+  }
+};
+
+// Landing route component: / -> role dashboard if logged in, else /login
+const HomeRedirect = () => {
+  if (!isLoggedIn()) return <Navigate to="/login" replace />;
+  const user = getCurrentUser();
+  return <Navigate to={roleRedirectPath(user?.role)} replace />;
+};
+
+// Generic ProtectedRoute with optional allowed roles
+const ProtectedRoute = ({
+  children,
+  allowedRoles,
+}: {
+  children: JSX.Element;
+  allowedRoles?: string[];
+}) => {
+  if (!isLoggedIn()) return <Navigate to="/login" replace />;
+
+  if (allowedRoles && allowedRoles.length > 0) {
+    const user = getCurrentUser();
+    if (!user?.role || !allowedRoles.includes(user.role)) {
+      return <Navigate to={roleRedirectPath(user?.role)} replace />;
+    }
+  }
+
+  return children;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -49,12 +107,23 @@ const App = () => (
       <Sonner position="top-center" />
       <BrowserRouter>
         <Routes>
-          {/* Main Entry & Super Admin */}
-          <Route path="/" element={<Login />} />
+          {/* ✅ MAIN ENTRY */}
+          <Route path="/" element={<HomeRedirect />} />
+
+          {/* ✅ LOGIN */}
+          <Route path="/login" element={<Login />} />
+
+          {/* ✅ SUPER ADMIN LOGIN (optional separate page) */}
           <Route path="/super-admin" element={<SuperAdminLogin />} />
 
-          {/* Super Admin Protected Routes */}
-          <Route element={<SuperAdminLayout />}>
+          {/* ✅ SUPER ADMIN PROTECTED */}
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={["superadmin"]}>
+                <SuperAdminLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route path="/super-admin/dashboard" element={<SuperAdminOverview />} />
             <Route path="/super-admin/branches" element={<SuperAdminBranches />} />
             <Route path="/super-admin/analytics" element={<SuperAdminAnalytics />} />
@@ -62,28 +131,85 @@ const App = () => (
             <Route path="/super-admin/settings" element={<SuperAdminSettings />} />
           </Route>
 
-          {/* Direct Login Page */}
-          <Route path="/login" element={<Login />} />
+          {/* ✅ WAITER PROTECTED */}
+          <Route
+            path="/waiter/tables"
+            element={
+              <ProtectedRoute allowedRoles={["waiter"]}>
+                <TableSelection />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/waiter/order/:tableNumber"
+            element={
+              <ProtectedRoute allowedRoles={["waiter"]}>
+                <OrderEntry />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/waiter/checkout"
+            element={
+              <ProtectedRoute allowedRoles={["waiter"]}>
+                <Checkout />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/waiter/orders"
+            element={
+              <ProtectedRoute allowedRoles={["waiter"]}>
+                <OrderStatus />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/waiter/payment"
+            element={
+              <ProtectedRoute allowedRoles={["waiter"]}>
+                <PaymentCollection />
+              </ProtectedRoute>
+            }
+          />
 
-          {/* Waiter Routes */}
-          <Route path="/waiter" element={<Login />} />
-          <Route path="/waiter/tables" element={<TableSelection />} />
-          <Route path="/waiter/order/:tableNumber" element={<OrderEntry />} />
-          <Route path="/waiter/checkout" element={<Checkout />} />
-          <Route path="/waiter/orders" element={<OrderStatus />} />
-          <Route path="/waiter/payment" element={<PaymentCollection />} />
+          {/* ✅ COUNTER PROTECTED */}
+          <Route
+            path="/counter/pos"
+            element={
+              <ProtectedRoute allowedRoles={["counter"]}>
+                <CounterPOS />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/counter/orders"
+            element={
+              <ProtectedRoute allowedRoles={["counter"]}>
+                <CounterOrders />
+              </ProtectedRoute>
+            }
+          />
 
-          {/* Counter Routes */}
-          <Route path="/counter" element={<Login />} />
-          <Route path="/counter/pos" element={<CounterPOS />} />
-          <Route path="/counter/orders" element={<CounterOrders />} />
+          {/* ✅ KITCHEN PROTECTED */}
+          <Route
+            path="/kitchen/display"
+            element={
+              <ProtectedRoute allowedRoles={["kitchen"]}>
+                <KitchenDisplay />
+              </ProtectedRoute>
+            }
+          />
 
-          {/* Kitchen Routes */}
-          <Route path="/kitchen" element={<Login />} />
-          <Route path="/kitchen/display" element={<KitchenDisplay />} />
-
-          {/* Admin Routes */}
-          <Route path="/admin/dashboard" element={<AdminLayout />}>
+          {/* ✅ ADMIN PROTECTED (nested layout stays working) */}
+          <Route
+            path="/admin/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route index element={<AdminDashboard />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="menu" element={<AdminMenu />} />
@@ -93,6 +219,12 @@ const App = () => (
             <Route path="reports" element={<AdminReports />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
+
+          {/* Optional: redirect base role paths */}
+          <Route path="/waiter" element={<Navigate to="/waiter/tables" replace />} />
+          <Route path="/counter" element={<Navigate to="/counter/pos" replace />} />
+          <Route path="/kitchen" element={<Navigate to="/kitchen/display" replace />} />
+          <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
