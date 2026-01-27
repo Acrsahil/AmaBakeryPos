@@ -3,17 +3,17 @@ from rest_framework.decorators import api_view, permission_classes  # ADD THIS I
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-# custom
 from .serializer_dir.users_serializer import (
     ChangePasswordSerializer,
     CustomTokenObtainPairSerializer,
 )
+
+# custom
 from .views_dir.product_view import ProductViewClass
 from .views_dir.users_view import UserViewClass
 
 UserView = UserViewClass
 ProductView = ProductViewClass
-
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
