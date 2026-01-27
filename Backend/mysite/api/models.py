@@ -31,10 +31,10 @@ class User(AbstractUser):
     phone = models.CharField(max_length=15, blank=True)
     branch = models.ForeignKey(
         Branch,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
+        related_name="branch_user",
         null=True,
         blank=True,
-        related_name="branch_user",
     )
 
     # UPDATED: Added the roles you need
@@ -67,6 +67,9 @@ class Product(models.Model):
     )
     low_stock_bar = models.IntegerField(default=0)
     date_added = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.name} - {self.category.branch.name}"
 
     class Meta:
         unique_together = ["name"]
