@@ -99,7 +99,15 @@ export default function AdminUsers() {
       setIsDialogOpen(false);
       setEditUser(null);
     } catch (err: any) {
-      toast.error("Operation failed", { description: err.message });
+      console.error("User operation error:", err);
+      const errorMessage = err.message || "Operation failed";
+      const errorDetail = errorMessage.includes("Branch not assigned")
+        ? "Your admin account needs to have a branch assigned. Please contact the super admin to assign a branch to your account."
+        : errorMessage;
+      toast.error("Operation failed", {
+        description: errorDetail,
+        duration: 6000
+      });
     } finally {
       setSubmitting(false);
     }
@@ -148,8 +156,6 @@ export default function AdminUsers() {
                   <SelectContent>
                     <SelectItem value="WAITER">Waiter</SelectItem>
                     <SelectItem value="KITCHEN">Kitchen Staff</SelectItem>
-                    <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
-                    <SelectItem value="ADMIN">Admin</SelectItem>
                     <SelectItem value="COUNTER">Counter</SelectItem>
                   </SelectContent>
                 </Select>
