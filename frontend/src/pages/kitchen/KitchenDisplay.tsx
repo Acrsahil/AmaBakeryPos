@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { ChefHat, LogOut, Bell, CheckCircle2, Clock, RotateCcw, MapPin, Utensils, Coffee } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from "sonner";
+import { logout } from "../../auth/auth";
+
 
 export default function KitchenDisplay() {
   const navigate = useNavigate();
@@ -151,10 +153,7 @@ export default function KitchenDisplay() {
               </div>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => {
-            localStorage.removeItem('currentUser');
-            navigate('/');
-          }} className="gap-2 font-bold text-xs uppercase tracking-widest h-9 rounded-xl border-slate-200">
+          <Button variant="outline" size="sm" onClick={logout} className="gap-2 font-bold text-xs uppercase tracking-widest h-9 rounded-xl border-slate-200">
             <LogOut className="h-3.5 w-3.5" />
             Sign Out
           </Button>

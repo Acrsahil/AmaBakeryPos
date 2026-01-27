@@ -44,29 +44,19 @@ import SuperAdminSettings from "./pages/superadmin/SuperAdminSettings";
 
 const queryClient = new QueryClient();
 
-// --------- AUTH HELPERS (frontend only) ----------
-const isLoggedIn = () => !!localStorage.getItem("access");
-
-const getCurrentUser = () => {
-  try {
-    const u = localStorage.getItem("currentUser");
-    return u ? JSON.parse(u) : null;
-  } catch {
-    return null;
-  }
-};
+import { isLoggedIn, getCurrentUser } from "./auth/auth";
 
 const roleRedirectPath = (role?: string) => {
   switch (role) {
-    case "superadmin":
+    case "ADMIN":
       return "/super-admin/dashboard";
-    case "admin":
+    case "BRANCH_MANAGER":
       return "/admin/dashboard";
-    case "waiter":
+    case "WAITER":
       return "/waiter/tables";
-    case "counter":
+    case "COUNTER":
       return "/counter/pos";
-    case "kitchen":
+    case "KITCHEN":
       return "/kitchen/display";
     default:
       return "/login";
@@ -119,7 +109,7 @@ const App = () => (
           {/* ✅ SUPER ADMIN PROTECTED */}
           <Route
             element={
-              <ProtectedRoute allowedRoles={["superadmin"]}>
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
                 <SuperAdminLayout />
               </ProtectedRoute>
             }
@@ -135,7 +125,7 @@ const App = () => (
           <Route
             path="/waiter/tables"
             element={
-              <ProtectedRoute allowedRoles={["waiter"]}>
+              <ProtectedRoute allowedRoles={["WAITER"]}>
                 <TableSelection />
               </ProtectedRoute>
             }
@@ -143,7 +133,7 @@ const App = () => (
           <Route
             path="/waiter/order/:tableNumber"
             element={
-              <ProtectedRoute allowedRoles={["waiter"]}>
+              <ProtectedRoute allowedRoles={["WAITER"]}>
                 <OrderEntry />
               </ProtectedRoute>
             }
@@ -151,7 +141,7 @@ const App = () => (
           <Route
             path="/waiter/checkout"
             element={
-              <ProtectedRoute allowedRoles={["waiter"]}>
+              <ProtectedRoute allowedRoles={["WAITER"]}>
                 <Checkout />
               </ProtectedRoute>
             }
@@ -159,7 +149,7 @@ const App = () => (
           <Route
             path="/waiter/orders"
             element={
-              <ProtectedRoute allowedRoles={["waiter"]}>
+              <ProtectedRoute allowedRoles={["WAITER"]}>
                 <OrderStatus />
               </ProtectedRoute>
             }
@@ -167,7 +157,7 @@ const App = () => (
           <Route
             path="/waiter/payment"
             element={
-              <ProtectedRoute allowedRoles={["waiter"]}>
+              <ProtectedRoute allowedRoles={["WAITER"]}>
                 <PaymentCollection />
               </ProtectedRoute>
             }
@@ -177,7 +167,7 @@ const App = () => (
           <Route
             path="/counter/pos"
             element={
-              <ProtectedRoute allowedRoles={["counter"]}>
+              <ProtectedRoute allowedRoles={["COUNTER"]}>
                 <CounterPOS />
               </ProtectedRoute>
             }
@@ -185,7 +175,7 @@ const App = () => (
           <Route
             path="/counter/orders"
             element={
-              <ProtectedRoute allowedRoles={["counter"]}>
+              <ProtectedRoute allowedRoles={["COUNTER"]}>
                 <CounterOrders />
               </ProtectedRoute>
             }
@@ -195,7 +185,7 @@ const App = () => (
           <Route
             path="/kitchen/display"
             element={
-              <ProtectedRoute allowedRoles={["kitchen"]}>
+              <ProtectedRoute allowedRoles={["KITCHEN"]}>
                 <KitchenDisplay />
               </ProtectedRoute>
             }
@@ -205,7 +195,7 @@ const App = () => (
           <Route
             path="/admin/dashboard"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute allowedRoles={["BRANCH_MANAGER"]}>
                 <AdminLayout />
               </ProtectedRoute>
             }

@@ -8,6 +8,8 @@ import {
     Settings,
     LogOut
 } from "lucide-react";
+import { logout } from "../../auth/auth";
+
 
 const navItems = [
     { icon: LayoutDashboard, label: "HQ Dashboard", path: "/super-admin/dashboard" },
@@ -69,8 +71,7 @@ export function SuperAdminSidebar({ className, onNavigate }: SuperAdminSidebarPr
             <div className="border-t border-sidebar-border p-3">
                 <button
                     onClick={() => {
-                        localStorage.removeItem('currentUser');
-                        navigate('/');
+                        logout();
                         if (onNavigate) onNavigate();
                     }}
                     className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all text-left"

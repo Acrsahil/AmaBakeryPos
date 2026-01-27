@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { branches, User } from "@/lib/mockData";
+import { logout } from "@/auth/auth";
+
 
 interface MobileHeaderProps {
   title: string;
@@ -97,11 +99,7 @@ export function MobileHeader({ title, showBack = false, showNotification = true,
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
                 className="flex items-center gap-3 p-3 rounded-lg cursor-pointer text-destructive focus:bg-destructive/5 focus:text-destructive active:scale-95 transition-all"
-                onClick={() => {
-                  localStorage.removeItem('currentUser');
-                  toast.success("Successfully logged out");
-                  navigate('/');
-                }}
+                onClick={logout}
               >
                 <LogOut className="h-4 w-4" />
                 <span className="font-bold">Logout</span>

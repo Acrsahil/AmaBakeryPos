@@ -6,32 +6,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { loginUsers, fetchMe } from "../api/index.js";
 
-function isLoggedIn() {
-  return !!localStorage.getItem("access");
-}
-
-function safeGetCurrentUser() {
-  try {
-    const u = localStorage.getItem("currentUser");
-    return u ? JSON.parse(u) : null;
-  } catch {
-    return null;
-  }
-}
-
-// 🔥 frontend fallback role guess (no backend needed)
-function guessRole(username: string) {
-  const u = (username || "").toLowerCase();
-
-  // if (u === "su" || u.startsWith("su") || u.startsWith("super")) return "superadmin";
-  if (u.startsWith("admin")) return "admin";
-  if (u.startsWith("waiter")) return "waiter";
-  if (u.startsWith("counter")) return "counter";
-  if (u.startsWith("kitchen")) return "kitchen";
-//  appleball
-  // default fallback
-  return "admin";
-}
+import { isLoggedIn, getCurrentUser } from "../auth/auth";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -43,19 +18,19 @@ export default function Login() {
 
   const redirectByRole = (role?: string) => {
     switch (role) {
-      case "superadmin":
+      case "ADMIN":
         navigate("/super-admin/dashboard", { replace: true });
         break;
-      case "admin":
+      case "BRANCH_MANAGER":
         navigate("/admin/dashboard", { replace: true });
         break;
-      case "waiter":
+      case "WAITER":
         navigate("/waiter/tables", { replace: true });
         break;
-      case "counter":
+      case "COUNTER":
         navigate("/counter/pos", { replace: true });
         break;
-      case "kitchen":
+      case "KITCHEN":
         navigate("/kitchen/display", { replace: true });
         break;
       default:
@@ -66,7 +41,7 @@ export default function Login() {
   // auto redirect if already logged in
   useEffect(() => {
     if (isLoggedIn()) {
-      const user = safeGetCurrentUser();
+      const user = getCurrentUser();
       if (user?.role) redirectByRole(user.role);
     }
   }, []);
@@ -80,31 +55,21 @@ export default function Login() {
       // 1) login -> save tokens
       await loginUsers(username, password);
 
-      // 2) try fetch profile
-      let user: any = null;
+      // 2) The tokens are already saved in localStorage by loginUsers.
+      // We can now get the user info from the token.
+      const user = getCurrentUser();
 
-      try {
-        user = await fetchMe(); // if backend supports
-      } catch (e) {
-        user = null;
-      }
-
-      // 3) if backend didn't give role, use frontend fallback
       if (!user?.role) {
-        user = {
-          username,
-          name: username,
-          role: guessRole(username),
-        };
+        throw new Error("Unable to identify user role from token.");
       }
 
       localStorage.setItem("currentUser", JSON.stringify(user));
-      if (user.role === "waiter") {
+      if (user.role === "WAITER") {
         localStorage.setItem("currentWaiter", JSON.stringify(user));
       }
 
       toast.success("Login Successful", {
-        description: `Welcome, ${user?.name || username}! (${user.role})`,
+        description: `Welcome, ${user?.username || username}! (${user.role})`,
       });
 
       redirectByRole(user.role);

@@ -36,6 +36,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { logout } from "../../auth/auth";
+
 
 interface CartItemData {
     item: MenuItem;
@@ -207,8 +209,7 @@ export default function CounterPOS() {
     };
 
     const handleLogout = () => {
-        localStorage.removeItem('currentUser');
-        navigate('/');
+        logout();
     };
 
     return (

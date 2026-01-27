@@ -27,9 +27,9 @@ async function safeJson(res) {
   } catch {
     throw new Error(
       `Server did not return JSON.\n` +
-        `Status: ${res.status}\n` +
-        `Content-Type: ${contentType}\n` +
-        `Preview: ${safePreview(text)}`
+      `Status: ${res.status}\n` +
+      `Content-Type: ${contentType}\n` +
+      `Preview: ${safePreview(text)}`
     );
   }
 }
@@ -50,7 +50,7 @@ export async function loginUsers(username, password) {
   if (!res.ok) {
     throw new Error(data?.detail || data?.message || "Invalid username or password");
   }
-  
+
   // expected: {access, refresh}
   if (!data?.access || !data?.refresh) {
     throw new Error("Login response missing tokens. Check backend response format.");
@@ -83,7 +83,78 @@ export async function fetchMe() {
   if (!res.ok) {
     throw new Error(data?.detail || "Failed to fetch user profile");
   }
-  console(data)
+  console.log(data);
 
   return data; // should include role, name, etc (if backend supports)
+}
+
+// Staff / User Management APIs
+export async function fetchUsers() {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + "/api/users/";
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to fetch users");
+  return data.users; // The backend returns {success, count, users}
+}
+
+export async function createUser(userData) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + "/api/users/";
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(userData),
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || JSON.stringify(data?.errors) || "Failed to create user");
+  return data.user;
+}
+
+export async function updateUser(id, userData) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + `/api/users/${id}/`;
+
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(userData),
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || JSON.stringify(data?.errors) || "Failed to update user");
+  return data.user;
+}
+
+export async function deleteUser(id) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + `/api/users/${id}/`;
+
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to delete user");
+  return data;
 }

@@ -1,54 +1,111 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { users } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Pencil, Trash2, User, Shield, ChefHat, UtensilsCrossed } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, User, Shield, ChefHat, UtensilsCrossed, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { fetchUsers, createUser, updateUser, deleteUser } from "../../api/index.js";
+
 
 interface UserType {
   id: string;
-  name: string;
-  role: 'waiter' | 'kitchen' | 'supervisor' | 'admin' | 'counter';
-  pin: string;
+  username: string;
+  full_name: string;
+  user_type: string;
+  branch_name?: string;
 }
 
-const roleIcons = {
-  waiter: UtensilsCrossed,
-  kitchen: ChefHat,
-  supervisor: Shield,
-  admin: Shield,
-  counter: User,
+const roleIcons: Record<string, any> = {
+  WAITER: UtensilsCrossed,
+  KITCHEN: ChefHat,
+  BRANCH_MANAGER: Shield,
+  ADMIN: Shield,
+  COUNTER: User,
 };
 
-const roleColors = {
-  waiter: 'bg-info/10 text-info',
-  kitchen: 'bg-warning/10 text-warning',
-  supervisor: 'bg-success/10 text-success',
-  admin: 'bg-primary/10 text-primary',
-  counter: 'bg-slate-100 text-slate-700',
+const roleColors: Record<string, string> = {
+  WAITER: 'bg-info/10 text-info',
+  KITCHEN: 'bg-warning/10 text-warning',
+  BRANCH_MANAGER: 'bg-success/10 text-success',
+  ADMIN: 'bg-primary/10 text-primary',
+  COUNTER: 'bg-slate-100 text-slate-700',
 };
 
 export default function AdminUsers() {
-  const [userList, setUserList] = useState<UserType[]>(users);
+  const [userList, setUserList] = useState<UserType[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserType | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  const filteredUsers = userList.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.role.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    loadUsers();
+  }, []);
 
-  const handleDelete = (userId: string) => {
-    setUserList(prev => prev.filter(user => user.id !== userId));
-    toast.success("User deleted");
+  const loadUsers = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchUsers();
+      setUserList(data);
+    } catch (err: any) {
+      toast.error("Failed to load users", { description: err.message });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const countByRole = (role: string) => userList.filter(u => u.role === role).length;
+  const filteredUsers = userList.filter(user =>
+    (user.full_name || user.username).toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.user_type.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleDelete = async (userId: string) => {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+    try {
+      await deleteUser(userId);
+      setUserList(prev => prev.filter(user => user.id !== userId));
+      toast.success("User deleted");
+    } catch (err: any) {
+      toast.error("Delete failed", { description: err.message });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const payload = {
+      full_name: formData.get("full_name"),
+      username: formData.get("username"),
+      user_type: formData.get("user_type"),
+      email: formData.get("email"),
+    };
+
+    try {
+      if (editUser) {
+        const updated = await updateUser(editUser.id, payload);
+        setUserList(prev => prev.map(u => u.id === editUser.id ? updated : u));
+        toast.success("User updated");
+      } else {
+        const password = formData.get("password") as string;
+        const newUser = await createUser({ ...payload, password });
+        setUserList(prev => [...prev, newUser]);
+        toast.success("User added");
+      }
+      setIsDialogOpen(false);
+      setEditUser(null);
+    } catch (err: any) {
+      toast.error("Operation failed", { description: err.message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const countByRole = (role: string) => userList.filter(u => u.user_type === role).length;
 
   return (
     <div className="p-6 space-y-6">
@@ -69,36 +126,45 @@ export default function AdminUsers() {
             <DialogHeader>
               <DialogTitle>{editUser ? 'Edit User' : 'Add New User'}</DialogTitle>
             </DialogHeader>
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={handleSubmit}>
               <div>
-                <Label htmlFor="name">Full Name</Label>
-                <Input id="name" placeholder="Enter name" defaultValue={editUser?.name} />
+                <Label htmlFor="full_name">Full Name</Label>
+                <Input id="full_name" name="full_name" placeholder="Enter name" defaultValue={editUser?.full_name} required />
               </div>
               <div>
-                <Label htmlFor="role">Role</Label>
-                <Select defaultValue={editUser?.role || 'waiter'}>
+                <Label htmlFor="username">Username</Label>
+                <Input id="username" name="username" placeholder="Enter username" defaultValue={editUser?.username} required />
+              </div>
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" name="email" type="email" placeholder="Enter email" required />
+              </div>
+              <div>
+                <Label htmlFor="user_type">Role</Label>
+                <Select name="user_type" defaultValue={editUser?.user_type || 'WAITER'}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="waiter">Waiter</SelectItem>
-                    <SelectItem value="kitchen">Kitchen Staff</SelectItem>
-                    <SelectItem value="supervisor">Supervisor</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="counter">Counter</SelectItem>
+                    <SelectItem value="WAITER">Waiter</SelectItem>
+                    <SelectItem value="KITCHEN">Kitchen Staff</SelectItem>
+                    <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="COUNTER">Counter</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="pin">PIN (4 digits)</Label>
-                <Input
-                  id="pin"
-                  type="password"
-                  maxLength={4}
-                  placeholder="••••"
-                  defaultValue={editUser?.pin}
-                />
-              </div>
+              {!editUser && (
+                <div>
+                  <Label htmlFor="password">Password (Default: amabakery@123)</Label>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    placeholder="••••••••"
+                  />
+                </div>
+              )}
               <div className="flex gap-2 pt-4">
                 <Button
                   type="button"
@@ -112,15 +178,11 @@ export default function AdminUsers() {
                   Cancel
                 </Button>
                 <Button
-                  type="button"
+                  type="submit"
                   className="flex-1"
-                  onClick={() => {
-                    toast.success(editUser ? "User updated" : "User added");
-                    setIsDialogOpen(false);
-                    setEditUser(null);
-                  }}
+                  disabled={submitting}
                 >
-                  {editUser ? 'Update' : 'Add'}
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (editUser ? 'Update' : 'Add')}
                 </Button>
               </div>
             </form>
@@ -130,16 +192,16 @@ export default function AdminUsers() {
 
       {/* Role Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        {(['waiter', 'kitchen', 'supervisor', 'admin', 'counter'] as const).map(role => {
+        {(['WAITER', 'KITCHEN', 'BRANCH_MANAGER', 'ADMIN', 'COUNTER'] as const).map(role => {
           const Icon = roleIcons[role];
           return (
             <div key={role} className="card-elevated p-4 flex items-center gap-3">
               <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${roleColors[role]}`}>
-                <Icon className="h-6 w-6" />
+                {Icon && <Icon className="h-6 w-6" />}
               </div>
               <div>
                 <p className="text-2xl font-bold">{countByRole(role)}</p>
-                <p className="text-sm text-muted-foreground capitalize">{role}s</p>
+                <p className="text-sm text-muted-foreground capitalize">{role.toLowerCase().replace('_', ' ')}s</p>
               </div>
             </div>
           );
@@ -173,39 +235,35 @@ export default function AdminUsers() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredUsers.map((user) => {
-                const Icon = roleIcons[user.role];
-                const isWaiter = user.role === 'waiter';
+                const Icon = roleIcons[user.user_type];
+                const isWaiter = user.user_type === 'WAITER';
 
                 return (
                   <tr key={user.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${roleColors[user.role]} shadow-sm`}>
-                          <Icon className="h-5 w-5" />
+                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${roleColors[user.user_type]} shadow-sm`}>
+                          {Icon && <Icon className="h-5 w-5" />}
                         </div>
-                        <span className="font-bold text-slate-700">{user.name}</span>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-700">{user.full_name || user.username}</span>
+                          <span className="text-xs text-slate-400">@{user.username}</span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={cn(
                         "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tight",
-                        roleColors[user.role]
+                        roleColors[user.user_type]
                       )}>
-                        {user.role}
+                        {user.user_type.replace('_', ' ')}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {isWaiter ? (
-                        <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
-                          <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-black uppercase">PIN</span>
-                          <span className="font-mono tracking-widest text-xs">••••</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
-                          <span className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase">User/Pass</span>
-                          <span className="font-mono text-xs opacity-50 italic">Encrypted</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+                        <span className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-black uppercase">User/Pass</span>
+                        <span className="font-mono text-xs opacity-50 italic">{user.branch_name || 'Global'}</span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex justify-center items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

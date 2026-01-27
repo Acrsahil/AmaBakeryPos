@@ -12,6 +12,8 @@ import {
   ChefHat,
 } from "lucide-react";
 import { branches, User } from "@/lib/mockData";
+import { logout } from "../../auth/auth";
+
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
@@ -80,13 +82,13 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
 
       {/* Logout */}
       <div className="border-t border-sidebar-border p-3">
-        <NavLink
-          to="/"
-          className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all"
+        <button
+          onClick={logout}
+          className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all text-left"
         >
           <LogOut className="h-5 w-5" />
           Logout
-        </NavLink>
+        </button>
       </div>
     </div>
   );
