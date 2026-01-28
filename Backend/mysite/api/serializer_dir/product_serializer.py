@@ -19,7 +19,6 @@ class ProductSerializer(serializers.ModelSerializer):
             "low_stock_bar",
             "category",
             "category_name",
-            # REMOVE: "branch",  # ← Product doesn't have this field!
             "branch_id",  # ← Use this (read-only through category)
             "branch_name",  # ← Use this (read-only through category)
             "date_added",

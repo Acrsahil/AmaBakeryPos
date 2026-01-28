@@ -45,7 +45,8 @@ class ProductViewClass(APIView):
             )
 
     def post(self, request):
-        pass
+        role = self.get_user_role(request.user)
+        # if role in ["SUPER_ADMIN","ADMIN"]:
 
     def put(self, request, id=None):
         pass

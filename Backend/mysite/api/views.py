@@ -11,6 +11,7 @@ from .serializer_dir.users_serializer import (
 # custom
 from .views_dir.product_view import ProductViewClass
 from .views_dir.users_view import UserViewClass
+from .views_dir.categorys_view import CategoryViewClass
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -19,6 +20,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 UserView = UserViewClass
 ProductView = ProductViewClass
+CategoryView = CategoryViewClass
 
 
 @api_view(["POST"])
