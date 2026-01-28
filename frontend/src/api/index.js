@@ -231,3 +231,56 @@ export async function deleteProduct(id) {
   if (!res.ok) throw new Error(data?.message || "Failed to delete product");
   return data;
 }
+
+// Category Management APIs
+export async function fetchCategories() {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + "/api/category/";
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to fetch categories");
+  return data.data; // The backend returns {success, data}
+}
+
+export async function createCategory(categoryData) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + "/api/category/";
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(categoryData),
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to create category");
+  return data.data || data.category;
+}
+
+export async function deleteCategory(id) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + `/api/category/${id}/`;
+
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to delete category");
+  return data;
+}

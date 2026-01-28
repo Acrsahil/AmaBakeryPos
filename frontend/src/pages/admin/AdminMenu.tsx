@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { menuItems, MenuItem, Category, getCategories } from "@/lib/mockData";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -7,76 +6,158 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Loader2, Package } from "lucide-react";
 import { toast } from "sonner";
+import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories, createCategory, deleteCategory } from "../../api/index.js";
+
+interface Product {
+  id: number;
+  name: string;
+  cost_price: string;
+  selling_price: string;
+  product_quantity: number;
+  low_stock_bar: number;
+  category: number; // This is the ID
+  category_name: string;
+  branch_id: number;
+  branch_name: string;
+  date_added: string;
+  available?: boolean;
+}
+
+interface BackendCategory {
+  id: number;
+  name: string;
+  branch: number;
+  branch_name: string;
+}
 
 export default function AdminMenu() {
-  const [items, setItems] = useState<MenuItem[]>(menuItems);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [editItem, setEditItem] = useState<MenuItem | null>(null);
+  const [editItem, setEditItem] = useState<Product | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  // State for Categories Management
-  const [categories, setCategories] = useState<Category[]>(getCategories());
+  // Categories Management
+  const [categories, setCategories] = useState<BackendCategory[]>([]);
   const [newCategoryInput, setNewCategoryInput] = useState("");
 
-  const filteredItems = items.filter(item => {
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [productsData, categoriesData] = await Promise.all([
+        fetchProducts(),
+        fetchCategories()
+      ]);
+
+      const initialized = productsData.map((p: Product) => ({
+        ...p,
+        available: p.product_quantity > 0
+      }));
+      setProducts(initialized);
+      setCategories(categoriesData);
+    } catch (err: any) {
+      toast.error("Failed to load data", { description: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredItems = products.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
+    const matchesCategory = categoryFilter === 'all' || item.category_name === categoryFilter;
     return matchesSearch && matchesCategory;
   }).sort((a, b) => a.name.localeCompare(b.name));
 
-  const updateCategories = (newCategories: Category[]) => {
-    setCategories(newCategories);
-    localStorage.setItem('categories', JSON.stringify(newCategories));
-  };
-
-  const handleToggleAvailability = (itemId: string) => {
-    setItems(prev => prev.map(item =>
-      item.id === itemId ? { ...item, available: !item.available } : item
+  const handleToggleAvailability = (productId: number) => {
+    setProducts(prev => prev.map(p =>
+      p.id === productId ? { ...p, available: !p.available } : p
     ));
     toast.success("Availability updated");
   };
 
-  const handleDelete = (itemId: string) => {
-    setItems(prev => prev.filter(item => item.id !== itemId));
-    toast.success("Item deleted");
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const payload = {
+      name: formData.get("name"),
+      cost_price: formData.get("cost_price"),
+      selling_price: formData.get("selling_price"),
+      product_quantity: parseInt(formData.get("product_quantity") as string),
+      low_stock_bar: parseInt(formData.get("low_stock_bar") as string),
+      category: parseInt(formData.get("category") as string),
+    };
+
+    try {
+      if (editItem) {
+        const updated = await updateProduct(editItem.id, payload);
+        const withAvailable = { ...updated, available: updated.product_quantity > 0 };
+        setProducts(prev => prev.map(p => p.id === editItem.id ? withAvailable : p));
+        toast.success("Item updated");
+      } else {
+        const newProduct = await createProduct(payload);
+        const withAvailable = { ...newProduct, available: newProduct.product_quantity > 0 };
+        setProducts(prev => [...prev, withAvailable]);
+        toast.success("Item added");
+      }
+      setIsDialogOpen(false);
+      setEditItem(null);
+    } catch (err: any) {
+      toast.error("Operation failed", { description: err.message });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleAddCategory = () => {
+  const handleDelete = async (productId: number) => {
+    if (!confirm("Are you sure you want to delete this item?")) return;
+
+    try {
+      await deleteProduct(productId);
+      setProducts(prev => prev.filter(p => p.id !== productId));
+      toast.success("Item deleted");
+    } catch (err: any) {
+      toast.error("Delete failed", { description: err.message });
+    }
+  };
+
+  const handleAddCategory = async () => {
     if (newCategoryInput.trim()) {
-      if (!categories.some(c => c.name === newCategoryInput.trim())) {
-        const newCategory: Category = {
-          id: `cat-${Date.now()}`,
-          name: newCategoryInput.trim(),
-          type: 'main' // Default to main
-        };
-        const updatedCategories = [...categories, newCategory].sort((a, b) => a.name.localeCompare(b.name));
-        updateCategories(updatedCategories);
+      try {
+        const newCat = await createCategory({ name: newCategoryInput.trim() });
+        setCategories(prev => [...prev, newCat].sort((a, b) => a.name.localeCompare(b.name)));
         setNewCategoryInput("");
         toast.success("Category added");
-      } else {
-        toast.error("Category already exists");
+      } catch (err: any) {
+        toast.error("Failed to add category", { description: err.message });
       }
     }
   };
 
-  const handleDeleteCategory = (catName: string) => {
-    // Check if category is in use
-    const isInUse = items.some(item => item.category === catName);
+  const handleDeleteCategory = async (catId: number, catName: string) => {
+    const isInUse = products.some(item => item.category === catId);
     if (isInUse) {
       toast.error("Cannot delete category attached to existing items");
       return;
     }
-    updateCategories(categories.filter(c => c.name !== catName));
-    toast.success("Category deleted");
-  };
 
-  const handleUpdateCategoryType = (catId: string, newType: 'main' | 'breakfast') => {
-    const updated = categories.map(c => c.id === catId ? { ...c, type: newType } : c);
-    updateCategories(updated);
-    toast.success("Category kitchen assignment updated");
+    if (!confirm(`Are you sure you want to delete category "${catName}"?`)) return;
+
+    try {
+      await deleteCategory(catId);
+      setCategories(prev => prev.filter(c => c.id !== catId));
+      toast.success("Category deleted");
+    } catch (err: any) {
+      toast.error("Failed to delete category", { description: err.message });
+    }
   };
 
   return (
@@ -97,7 +178,7 @@ export default function AdminMenu() {
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="w-full sm:w-auto">
+              <Button size="sm" className="w-full sm:w-auto" onClick={() => setEditItem(null)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Item
               </Button>
@@ -106,42 +187,50 @@ export default function AdminMenu() {
               <DialogHeader>
                 <DialogTitle>{editItem ? 'Edit Item' : 'Add New Item'}</DialogTitle>
               </DialogHeader>
-              <form className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <Label htmlFor="name">Item Name</Label>
-                  <Input id="name" placeholder="Enter item name" defaultValue={editItem?.name} />
+                  <Input id="name" name="name" placeholder="Enter item name" defaultValue={editItem?.name} required />
                 </div>
-                <div>
-                  <Label htmlFor="price">Price (Rs.)</Label>
-                  <Input id="price" type="number" placeholder="0" defaultValue={editItem?.price} />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="cost_price">Cost Price (Rs.)</Label>
+                    <Input id="cost_price" name="cost_price" type="number" step="0.01" placeholder="0.00" defaultValue={editItem?.cost_price} required />
+                  </div>
+                  <div>
+                    <Label htmlFor="selling_price">Selling Price (Rs.)</Label>
+                    <Input id="selling_price" name="selling_price" type="number" step="0.01" placeholder="0.00" defaultValue={editItem?.selling_price} required />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="product_quantity">Initial Stock</Label>
+                    <Input id="product_quantity" name="product_quantity" type="number" placeholder="0" defaultValue={editItem?.product_quantity} required />
+                  </div>
+                  <div>
+                    <Label htmlFor="low_stock_bar">Low Stock Threshold</Label>
+                    <Input id="low_stock_bar" name="low_stock_bar" type="number" placeholder="0" defaultValue={editItem?.low_stock_bar} required />
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="category">Category</Label>
-                  <Select defaultValue={editItem?.category || categories[0]?.name}>
+                  <Select name="category" defaultValue={editItem?.category?.toString()}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map(cat => (
-                        <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                        <SelectItem key={cat.id} value={cat.id.toString()}>{cat.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="available">Available</Label>
-                  <Switch id="available" defaultChecked={editItem?.available ?? true} />
                 </div>
                 <div className="flex gap-2 pt-4">
                   <Button type="button" variant="outline" className="flex-1" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="button" className="flex-1" onClick={() => {
-                    toast.success(editItem ? "Item updated" : "Item added");
-                    setIsDialogOpen(false);
-                    setEditItem(null);
-                  }}>
-                    {editItem ? 'Update' : 'Add'}
+                  <Button type="submit" className="flex-1" disabled={submitting}>
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : (editItem ? 'Update' : 'Add')}
                   </Button>
                 </div>
               </form>
@@ -150,7 +239,6 @@ export default function AdminMenu() {
         </div>
 
         <TabsContent value="items" className="space-y-4 mt-0">
-
           {/* Filters */}
           <div className="space-y-4">
             <div className="card-elevated p-4">
@@ -181,7 +269,7 @@ export default function AdminMenu() {
                   variant={categoryFilter === cat.name ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setCategoryFilter(cat.name)}
-                  className="whitespace-nowrap rounded-full"
+                  className="whitespace-nowrap rounded-full font-medium"
                 >
                   {cat.name}
                 </Button>
@@ -189,57 +277,62 @@ export default function AdminMenu() {
             </div>
           </div>
 
-          {/* Menu Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredItems.map((item) => (
-              <div
-                key={item.id}
-                className={`card-elevated p-4 ${!item.available && 'opacity-60'}`}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-foreground">{item.name}</h3>
-                    <p className="text-sm text-muted-foreground">{item.category}</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredItems.map((item) => (
+                <div
+                  key={item.id}
+                  className={`card-elevated p-4 ${!item.available && 'opacity-60'}`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold text-foreground">{item.name}</h3>
+                      <p className="text-sm text-muted-foreground">{item.category_name}</p>
+                    </div>
+                    <span className="text-lg font-bold text-primary">Rs.{item.selling_price}</span>
                   </div>
-                  <span className="text-lg font-bold text-primary">Rs.{item.price}</span>
-                </div>
 
-                <div className="flex items-center justify-between pt-3 border-t">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={item.available}
-                      onCheckedChange={() => handleToggleAvailability(item.id)}
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      {item.available ? 'Available' : 'Out of stock'}
-                    </span>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setEditItem(item);
-                        setIsDialogOpen(true);
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => handleDelete(item.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={item.available}
+                        onCheckedChange={() => handleToggleAvailability(item.id)}
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {item.available ? 'Available' : 'Out of stock'}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditItem(item);
+                          setIsDialogOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
-          {filteredItems.length === 0 && (
+          {!loading && filteredItems.length === 0 && (
             <div className="card-elevated py-12 text-center text-muted-foreground">
               No items found matching your criteria
             </div>
@@ -255,7 +348,7 @@ export default function AdminMenu() {
                 value={newCategoryInput}
                 onChange={(e) => setNewCategoryInput(e.target.value)}
               />
-              <Button onClick={handleAddCategory}>
+              <Button onClick={handleAddCategory} className="font-bold">
                 <Plus className="h-4 w-4 mr-2" />
                 Add
               </Button>
@@ -264,32 +357,17 @@ export default function AdminMenu() {
             <div className="space-y-2">
               <div className="grid grid-cols-12 gap-4 px-4 py-2 text-sm font-bold text-muted-foreground bg-slate-100/50 rounded-lg">
                 <div className="col-span-6">Category Name</div>
-                <div className="col-span-4">Kitchen Assignment</div>
-                <div className="col-span-2 text-right">Actions</div>
+                <div className="col-span-6 text-right">Actions</div>
               </div>
               {categories.map((category) => (
                 <div key={category.id} className="grid grid-cols-12 gap-4 items-center p-3 bg-slate-50 rounded-lg border border-slate-100 group">
                   <div className="col-span-6 font-medium">{category.name}</div>
-                  <div className="col-span-4">
-                    <Select
-                      value={category.type}
-                      onValueChange={(val: 'main' | 'breakfast') => handleUpdateCategoryType(category.id, val)}
-                    >
-                      <SelectTrigger className="h-8 text-xs font-bold uppercase tracking-wide bg-white border-slate-200">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="main">Main Kitchen</SelectItem>
-                        <SelectItem value="breakfast">Breakfast Kitchen</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2 text-right">
+                  <div className="col-span-6 text-right">
                     <Button
                       variant="ghost"
                       size="sm"
                       className="text-destructive hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all h-8 w-8 p-0"
-                      onClick={() => handleDeleteCategory(category.name)}
+                      onClick={() => handleDeleteCategory(category.id, category.name)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
