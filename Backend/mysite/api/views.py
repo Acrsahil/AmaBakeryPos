@@ -12,11 +12,13 @@ from .serializer_dir.users_serializer import (
 from .views_dir.product_view import ProductViewClass
 from .views_dir.users_view import UserViewClass
 
-UserView = UserViewClass
-ProductView = ProductViewClass
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+
+UserView = UserViewClass
+ProductView = ProductViewClass
 
 
 @api_view(["POST"])
