@@ -1,6 +1,7 @@
 # api/admin.py
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+
 from .models import Branch, Product, ProductCategory, User
 
 
@@ -20,16 +21,24 @@ class CustomUserAdmin(UserAdmin):
     )
 
 
-@admin.register(Branch)  
+@admin.register(Branch)
 class BranchAdmin(admin.ModelAdmin):
     pass
 
 
-@admin.register(ProductCategory)  
+@admin.register(ProductCategory)
 class ProductCategoryAdmin(admin.ModelAdmin):
     pass
 
-#
-@admin.register(Product)  
+
+@admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    pass
+    list_display = (
+        "id",
+        "name",
+        "product_quantity",
+        "date_added",
+    )
+    list_filter = ("category", "is_available", "date_added")
+    search_fields = ("name", "category__name")
+    ordering = ("date_added",)
