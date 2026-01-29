@@ -291,48 +291,69 @@ export default function AdminMenu() {
                                 </DialogTitle>
                             </DialogHeader>
                             {viewItem && (
-                                <div className="space-y-6 pt-4">
-                                    <div className="space-y-1.5">
+                                <div className="space-y-4 pt-4">
+                                    <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Item Name</Label>
-                                        <div className="h-12 px-4 flex items-center text-lg font-bold rounded-2xl bg-slate-50 border-none text-slate-900">
+                                        <div className="h-12 px-4 flex items-center text-lg font-bold rounded-2xl bg-slate-50 border border-slate-200 text-slate-900">
                                             {viewItem.name}
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Cost Price</Label>
-                                            <div className="h-12 px-4 flex items-center font-bold rounded-2xl bg-slate-50 border-none text-slate-600">
-                                                Rs. {viewItem.cost_price}
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Cost Price (Rs.)</Label>
+                                            <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 font-medium">
+                                                {viewItem.cost_price}
                                             </div>
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price</Label>
-                                            <div className="h-12 px-4 flex items-center font-black rounded-2xl bg-slate-50 border-none text-primary">
-                                                Rs. {viewItem.selling_price}
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price (Rs.)</Label>
+                                            <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 font-bold text-primary">
+                                                {viewItem.selling_price}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Current Stock</Label>
+                                            <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 font-bold">
+                                                {viewItem.product_quantity}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Low Stock Limit</Label>
+                                            <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 font-medium">
+                                                {viewItem.low_stock_bar}
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4 items-end">
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Category & Branch</Label>
-                                            <div className="h-12 px-4 flex items-center justify-between rounded-2xl bg-slate-50 border-none">
-                                                <span className="font-bold text-slate-600">{viewItem.category_name}</span>
-                                                <Badge variant="outline" className="font-black text-[10px] uppercase border-slate-200">{viewItem.branch_name}</Badge>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Category</Label>
+                                            <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-700 font-bold">
+                                                {viewItem.category_name}
                                             </div>
                                         </div>
                                         <div className="flex items-center space-x-3 pb-2.5 pl-2">
-                                            <div className={`h-12 w-full px-4 flex items-center gap-2 rounded-2xl border-none ${viewItem.is_available ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                                            <div className={`h-12 w-full px-4 flex items-center gap-2 rounded-2xl border border-slate-200 ${viewItem.is_available ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
                                                 {viewItem.is_available ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
                                                 <span className="text-sm font-black uppercase">{viewItem.is_available ? 'Available' : 'Hidden'}</span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="pt-4">
+                                    <div className="flex gap-3 pt-6">
                                         <Button
-                                            className="w-full h-12 rounded-2xl font-bold bg-primary hover:bg-primary/90 shadow-lg text-white"
+                                            variant="outline"
+                                            className="flex-1 h-12 rounded-2xl font-bold"
+                                            onClick={() => setIsViewDialogOpen(false)}
+                                        >
+                                            Close
+                                        </Button>
+                                        <Button
+                                            className="flex-1 h-12 rounded-2xl font-bold shadow-lg shadow-primary/20"
                                             onClick={() => {
                                                 setEditItem(viewItem);
                                                 setIsViewDialogOpen(false);

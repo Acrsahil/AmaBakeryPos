@@ -280,81 +280,78 @@ export default function AdminInventory() {
             </DialogTitle>
           </DialogHeader>
           {viewProduct && (
-            <div className="space-y-6 pt-4">
-              <div className="space-y-1.5">
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Product Name</Label>
-                <div className="h-12 px-4 flex items-center text-lg font-bold rounded-2xl bg-slate-50 border-none text-slate-900">
+                <div className="h-12 px-4 flex items-center text-lg font-bold rounded-2xl bg-slate-50 border border-slate-200 text-slate-900">
                   {viewProduct.name}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Cost Price</Label>
-                  <div className="h-12 px-4 flex items-center font-bold rounded-2xl bg-slate-50 border-none text-slate-600">
-                    Rs. {viewProduct.cost_price}
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Cost Price (Rs.)</Label>
+                  <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 font-medium">
+                    {viewProduct.cost_price}
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price</Label>
-                  <div className="h-12 px-4 flex items-center font-black rounded-2xl bg-slate-50 border-none text-primary">
-                    Rs. {viewProduct.selling_price}
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Selling Price (Rs.)</Label>
+                  <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 font-bold text-primary">
+                    {viewProduct.selling_price}
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Current Stock</Label>
-                  <div className={`h-12 px-4 flex items-center font-black text-xl rounded-2xl bg-slate-50 border-none ${viewProduct.product_quantity <= viewProduct.low_stock_bar ? 'text-red-600' : 'text-slate-900'}`}>
-                    {viewProduct.product_quantity} Units
+                  <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 font-bold">
+                    {viewProduct.product_quantity}
                   </div>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Low Stock Limit</Label>
-                  <div className="h-12 px-4 flex items-center font-bold rounded-2xl bg-slate-50 border-none text-slate-600">
-                    {viewProduct.low_stock_bar} Units
+                  <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 font-medium">
+                    {viewProduct.low_stock_bar}
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 items-end">
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Category & Branch</Label>
-                  <div className="h-12 px-4 flex items-center justify-between rounded-2xl bg-slate-50 border-none">
-                    <span className="font-bold text-slate-600">{viewProduct.category_name}</span>
-                    <Badge variant="outline" className="font-black text-[10px] uppercase border-slate-200">{viewProduct.branch_name}</Badge>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Category</Label>
+                  <div className="h-12 px-4 flex items-center rounded-2xl bg-slate-50 border border-slate-200 text-slate-700 font-bold">
+                    {viewProduct.category_name}
                   </div>
                 </div>
                 <div className="flex items-center space-x-3 pb-2.5 pl-2">
-                  <div className={`h-12 w-full px-4 flex items-center gap-2 rounded-2xl border-none ${viewProduct.is_available ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                  <div className={`h-12 w-full px-4 flex items-center gap-2 rounded-2xl border border-slate-200 ${viewProduct.is_available ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
                     {viewProduct.is_available ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-                    <span className="text-sm font-black uppercase">{viewProduct.is_available ? 'Live Selection' : 'Hidden from Menu'}</span>
+                    <span className="text-sm font-black uppercase">{viewProduct.is_available ? 'Available for Sale' : 'Hidden from Menu'}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-primary rounded-[2rem] p-6 text-white flex justify-between items-center shadow-xl">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white-500 mb-1">Estimated Profit Margin</p>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-black">{calculateProfit(viewProduct.cost_price, viewProduct.selling_price).margin}%</span>
-                    <span className="text-white-400 font-bold">/ Unit</span>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end">
-                  <Button
-                    className="h-12 px-6 rounded-2xl font-bold bg-white text-slate-900 hover:bg-slate-100 transition-all shadow-lg"
-                    onClick={() => {
-                      setEditProduct(viewProduct);
-                      setIsViewDialogOpen(false);
-                      setIsDialogOpen(true);
-                    }}
-                  >
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Edit Product
-                  </Button>
-                </div>
+              <div className="flex gap-3 pt-6">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 rounded-2xl font-bold"
+                  onClick={() => setIsViewDialogOpen(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  className="flex-1 h-12 rounded-2xl font-bold shadow-lg shadow-primary/20"
+                  onClick={() => {
+                    setEditProduct(viewProduct);
+                    setIsViewDialogOpen(false);
+                    setIsDialogOpen(true);
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit Product
+                </Button>
               </div>
             </div>
           )}
@@ -387,8 +384,7 @@ export default function AdminInventory() {
                 <tr className="bg-slate-50 border-b border-slate-100">
                   <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-400">Product</th>
                   <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-400">Category</th>
-                  <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-400">Branch</th>
-                  <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-400">Pricing</th>
+                  <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-400">Price (Rs.)</th>
                   <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-400">Stock</th>
                   <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-400">Status</th>
                   <th className="px-6 py-4 text-center text-xs font-black uppercase tracking-wider text-slate-400">Actions</th>
@@ -427,24 +423,8 @@ export default function AdminInventory() {
                         <td className="px-6 py-4 text-slate-500 font-medium uppercase text-[10px] tracking-wider">
                           {product.category_name}
                         </td>
-                        <td className="px-6 py-4 text-slate-500 text-xs">
-                          {product.branch_name}
-                        </td>
                         <td className="px-6 py-4">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-slate-400 uppercase">Cost:</span>
-                              <span className="font-bold text-slate-600">Rs.{product.cost_price}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-slate-400 uppercase">Sell:</span>
-                              <span className="font-bold text-primary">Rs.{product.selling_price}</span>
-                            </div>
-                            <div className="text-[10px] text-green-600 font-bold flex items-center gap-1">
-                              +Rs.{profit.toFixed(2)} ({margin}%)
-                              {parseFloat(margin) > 30 && <TrendingUp className="h-2.5 w-2.5" />}
-                            </div>
-                          </div>
+                          <span className="font-bold text-primary">Rs.{product.selling_price}</span>
                         </td>
                         <td className="px-6 py-4 text-xs">
                           <span className={`font-bold ${isLow ? 'text-red-600' : 'text-slate-700'}`}>
