@@ -76,7 +76,7 @@ class ProductViewClass(APIView):
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
 
-        if id:
+        # if id:
 
     def delete(self, request, id=None):
         pass
