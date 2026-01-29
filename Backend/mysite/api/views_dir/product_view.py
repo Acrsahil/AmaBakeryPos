@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.views import APIView, Response
 
-from ..models import Product,ProductCategory
+from ..models import Product, ProductCategory
 from ..serializer_dir.product_serializer import ProductSerializer
 
 
@@ -305,4 +305,41 @@ class ProductViewClass(APIView):
             )
 
     def delete(self, request, id=None):
-        pass
+        role = self.get_user_role(request.user)
+        my_branch = request.user.branch
+
+        if role not in ["SUPER_ADMIN", "BRANCH_MANAGER", "ADMIN"]:
+            return Response(
+                {
+                    "success": False,
+                    "message": "You don't have permission to delete products.",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not id:
+            return Response(
+                {"success": False, "message": "Product ID is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+            try:
+                if role in ["ADMIN", "BRANCH_MANAGER", "SUPER_ADMIN"]:
+                    product = Product.objects.get(id=id)
+                else:
+                    product = Product.objects.get(id=id, category__branch=my_branch)
+                product_name = product.name
+                product.delete()
+
+                return Response(
+                    {
+                        "success": True,
+                        "message": f"Product '{product_name}' deleted successfully.",
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            except Product.DoesNotExist:
+                return Response(
+                    {"success": False, "message": "Product not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
