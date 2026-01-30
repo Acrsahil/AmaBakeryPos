@@ -302,3 +302,55 @@ export async function deleteCategory(id) {
   if (!res.ok) throw new Error(data?.message || "Failed to delete category");
   return data;
 }
+// Branch Management APIs (SuperAdmin)
+export async function fetchBranches() {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + "/api/branch/";
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to fetch branches");
+  return data; // Returns {success, count, data: [...]}
+}
+
+export async function createBranch(branchData) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + "/api/branch/";
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(branchData),
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to create branch");
+  return data; // Returns {success, message, data}
+}
+
+export async function deleteBranch(id) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + `/api/branch/${id}/`;
+
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to delete branch");
+  return data;
+}

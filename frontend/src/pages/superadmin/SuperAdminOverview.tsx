@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Store,
@@ -12,30 +12,93 @@ import {
     Clock,
     MoreVertical,
     ExternalLink,
-    Globe
+    Globe,
+    Loader2
 } from "lucide-react";
-import { branches, Branch, users } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { fetchBranches, createBranch } from "../../api/index.js";
+import { users as mockUsers } from "@/lib/mockData";
+
+interface Branch {
+    id: number;
+    name: string;
+    location: string;
+    status?: string;
+    manager?: string;
+    revenue?: number;
+    staffCount?: number;
+}
 
 export default function SuperAdminOverview() {
     const navigate = useNavigate();
+    const [branches, setBranches] = useState<Branch[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [isAddOpen, setIsAddOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [form, setForm] = useState({ name: "", location: "" });
+
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const response = await fetchBranches();
+            setBranches(response.data || []);
+        } catch (err: any) {
+            toast.error(err.message || "Failed to load dashboard data");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCreateBranch = async () => {
+        if (!form.name || !form.location) {
+            toast.error("Please fill all fields");
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const response = await createBranch(form);
+            toast.success(response.message || "Branch created successfully");
+            setIsAddOpen(false);
+            setForm({ name: "", location: "" });
+            loadData();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to create branch");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     const filteredBranches = branches.filter(b =>
         b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         b.location.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const totalRevenue = branches.reduce((sum, b) => sum + b.revenue, 0);
-    const totalStaff = branches.reduce((sum, b) => sum + b.staffCount, 0);
-    const activeBranches = branches.filter(b => b.status === 'active').length;
+    const totalRevenue = branches.reduce((sum, b) => sum + (b.revenue || 0), 0);
+    const totalStaff = branches.reduce((sum, b) => sum + (b.staffCount || 0), 0);
+    const activeBranches = branches.filter(b => (b.status || 'active') === 'active').length;
 
     const handleAccessBranch = (branch: Branch) => {
-        const branchAdmin = users.find(u => u.branchId === branch.id && u.role === 'admin');
+        // Find an admin for this branch in mock data for now, since we don't have a fetchUsersByBranch API yet
+        const branchAdmin = mockUsers.find(u => u.branchId === branch.id && u.role === 'admin');
 
         if (branchAdmin) {
             localStorage.setItem('currentUser', JSON.stringify(branchAdmin));
@@ -45,7 +108,7 @@ export default function SuperAdminOverview() {
             navigate('/admin/dashboard');
         } else {
             toast.error("Access Denied", {
-                description: "No admin account found for this branch.",
+                description: "No admin account found for this branch in our records.",
             });
         }
     };
@@ -56,7 +119,9 @@ export default function SuperAdminOverview() {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl md:text-3xl font-black tracking-tight">Enterprise Overview</h1>
-                    <p className="text-sm md:text-base text-muted-foreground font-medium">Monitoring {branches.length} branches across the network.</p>
+                    <p className="text-sm md:text-base text-muted-foreground font-medium">
+                        {loading ? "Syncing data..." : `Monitoring ${branches.length} branches across the network.`}
+                    </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border text-sm shadow-sm">
@@ -90,7 +155,7 @@ export default function SuperAdminOverview() {
                             <Store className="h-4 w-4" />
                         </div>
                     </div>
-                    <p className="text-2xl font-black text-slate-900">{activeBranches} / {branches.length}</p>
+                    <p className="text-2xl font-black text-slate-900">{loading ? "---" : `${activeBranches} / ${branches.length}`}</p>
                 </div>
 
                 <div className="card-elevated p-6 space-y-2 border-2 border-slate-50">
@@ -100,7 +165,7 @@ export default function SuperAdminOverview() {
                             <Users className="h-4 w-4" />
                         </div>
                     </div>
-                    <p className="text-2xl font-black text-slate-900">{totalStaff} Staff</p>
+                    <p className="text-2xl font-black text-slate-900">{loading ? "---" : `${totalStaff} Staff`}</p>
                 </div>
 
                 <div className="card-elevated p-6 space-y-2 gradient-warm text-white border-none shadow-lg shadow-primary/20">
@@ -108,7 +173,7 @@ export default function SuperAdminOverview() {
                         <h3 className="text-xs font-black uppercase tracking-widest opacity-80">Top Performer</h3>
                         <TrendingUp className="h-5 w-5" />
                     </div>
-                    <p className="text-xl font-black truncate">Kathmandu Main</p>
+                    <p className="text-xl font-black truncate">{branches.length > 0 ? branches[0].name : "N/A"}</p>
                 </div>
             </div>
 
@@ -128,79 +193,91 @@ export default function SuperAdminOverview() {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead className="bg-slate-50/80 text-slate-400">
-                            <tr>
-                                <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest min-w-[200px]">Branch</th>
-                                <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Status</th>
-                                <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Manager</th>
-                                <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Staff</th>
-                                <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest">Revenue</th>
-                                <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {filteredBranches.map((branch) => (
-                                <tr key={branch.id} className="hover:bg-slate-50/50 transition-colors group">
-                                    <td className="px-6 py-5 cursor-pointer min-w-[200px]" onClick={() => handleAccessBranch(branch)}>
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-11 w-11 rounded-xl bg-primary/5 flex items-center justify-center text-primary border border-primary/10 group-hover:bg-primary group-hover:text-white transition-all shrink-0">
-                                                <Store className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-slate-900 group-hover:text-primary transition-colors truncate">{branch.name}</p>
-                                                <p className="text-xs text-slate-500 font-medium flex items-center gap-1">
-                                                    <MapPin className="h-3 w-3" /> {branch.location}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-5">
-                                        <Badge className={cn(
-                                            "font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full",
-                                            branch.status === 'active'
-                                                ? 'bg-green-50 text-green-700 border border-green-100'
-                                                : 'bg-slate-100 text-slate-500 border border-slate-200'
-                                        )}>
-                                            {branch.status}
-                                        </Badge>
-                                    </td>
-                                    <td className="px-6 py-5 text-sm font-bold text-slate-600 whitespace-nowrap">{branch.manager}</td>
-                                    <td className="px-6 py-5 whitespace-nowrap">
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex -space-x-1.5 font-bold">
-                                                {[1, 2, 3].map(i => (
-                                                    <div key={i} className="h-7 w-7 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[8px] text-slate-400">
-                                                        <Users className="h-3 w-3" />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <span className="text-[10px] font-black text-slate-400">+{branch.staffCount - 3}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-5 text-right whitespace-nowrap">
-                                        <p className="font-black text-slate-900">Rs. {branch.revenue.toLocaleString()}</p>
-                                        <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Good Standing</p>
-                                    </td>
-                                    <td className="px-6 py-5 text-right whitespace-nowrap">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <Button
-                                                size="sm"
-                                                onClick={() => handleAccessBranch(branch)}
-                                                className="gradient-warm text-white hover:shadow-lg hover:shadow-primary/20 h-9 px-4 rounded-xl font-black uppercase tracking-widest text-[9px] transition-all hover:scale-105 active:scale-95"
-                                            >
-                                                Access
-                                                <ExternalLink className="h-3 w-3 ml-1.5" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-slate-100 text-slate-400">
-                                                <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </td>
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-20 bg-white">
+                            <Loader2 className="h-10 w-10 animate-spin text-primary/30" />
+                            <p className="text-muted-foreground mt-4 font-medium">Fetching records...</p>
+                        </div>
+                    ) : filteredBranches.length === 0 ? (
+                        <div className="text-center py-12 bg-white text-muted-foreground">
+                            <Store className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                            <p>No branches found.</p>
+                        </div>
+                    ) : (
+                        <table className="w-full">
+                            <thead className="bg-slate-50/80 text-slate-400">
+                                <tr>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest min-w-[200px]">Branch</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Status</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Manager</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Staff</th>
+                                    <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest">Revenue</th>
+                                    <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest">Actions</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                                {filteredBranches.map((branch) => (
+                                    <tr key={branch.id} className="hover:bg-slate-50/50 transition-colors group">
+                                        <td className="px-6 py-5 cursor-pointer min-w-[200px]" onClick={() => handleAccessBranch(branch)}>
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-11 w-11 rounded-xl bg-primary/5 flex items-center justify-center text-primary border border-primary/10 group-hover:bg-primary group-hover:text-white transition-all shrink-0">
+                                                    <Store className="h-5 w-5" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-slate-900 group-hover:text-primary transition-colors truncate">{branch.name}</p>
+                                                    <p className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                                                        <MapPin className="h-3 w-3" /> {branch.location}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            <Badge className={cn(
+                                                "font-black text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full",
+                                                (branch.status || 'active') === 'active'
+                                                    ? 'bg-green-50 text-green-700 border border-green-100'
+                                                    : 'bg-slate-100 text-slate-500 border border-slate-200'
+                                            )}>
+                                                {branch.status || 'active'}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-6 py-5 text-sm font-bold text-slate-600 whitespace-nowrap">{branch.manager || "N/A"}</td>
+                                        <td className="px-6 py-5 whitespace-nowrap">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex -space-x-1.5 font-bold">
+                                                    {[1, 2, 3].map(i => (
+                                                        <div key={i} className="h-7 w-7 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[8px] text-slate-400">
+                                                            <Users className="h-3 w-3" />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <span className="text-[10px] font-black text-slate-400">+{Math.max(0, (branch.staffCount || 0) - 3)}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-5 text-right whitespace-nowrap">
+                                            <p className="font-black text-slate-900">Rs. {(branch.revenue || 0).toLocaleString()}</p>
+                                            <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Good Standing</p>
+                                        </td>
+                                        <td className="px-6 py-5 text-right whitespace-nowrap">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => handleAccessBranch(branch)}
+                                                    className="gradient-warm text-white hover:shadow-lg hover:shadow-primary/20 h-9 px-4 rounded-xl font-black uppercase tracking-widest text-[9px] transition-all hover:scale-105 active:scale-95"
+                                                >
+                                                    Access
+                                                    <ExternalLink className="h-3 w-3 ml-1.5" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-slate-100 text-slate-400">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
             </div>
 
@@ -237,12 +314,63 @@ export default function SuperAdminOverview() {
                         <p className="text-sm font-medium opacity-90 leading-relaxed">Ready to expand? Set up a new enterprise branch node in seconds and monitor everything globally.</p>
                     </div>
                     <Button
+                        onClick={() => setIsAddOpen(true)}
                         className="w-full mt-10 bg-white text-primary hover:bg-white/90 h-14 rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
                     >
                         Add New Branch
                     </Button>
                 </div>
             </div>
+
+            {/* Creation Dialog */}
+            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                <DialogContent className="sm:max-w-[425px] rounded-[2rem]">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl font-black text-slate-900">Add New Branch</DialogTitle>
+                        <DialogDescription className="font-medium">
+                            Create a new branch location in the system.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="name" className="text-sm font-bold uppercase tracking-wider text-slate-500 ml-1">Branch Name</Label>
+                            <Input
+                                id="name"
+                                value={form.name}
+                                onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
+                                placeholder="Ama Bakery - Kathmandu"
+                                className="h-12 rounded-xl border-slate-200 focus:ring-primary shadow-sm"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="location" className="text-sm font-bold uppercase tracking-wider text-slate-500 ml-1">Location Address</Label>
+                            <Input
+                                id="location"
+                                value={form.location}
+                                onChange={(e) => setForm(prev => ({ ...prev, location: e.target.value }))}
+                                placeholder="Baneshwor, Kathmandu"
+                                className="h-12 rounded-xl border-slate-200 focus:ring-primary shadow-sm"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setIsAddOpen(false)}
+                            className="h-12 rounded-xl font-bold"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleCreateBranch}
+                            disabled={isSubmitting}
+                            className="h-12 px-8 rounded-xl gradient-warm text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-orange-200"
+                        >
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : "Create Branch"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
