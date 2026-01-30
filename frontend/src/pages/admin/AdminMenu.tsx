@@ -168,10 +168,10 @@ export default function AdminMenu() {
     const handleAddCategory = async () => {
         if (newCategoryInput.trim()) {
             try {
-                const newCat = await createCategory({ name: newCategoryInput.trim() });
-                setCategories(prev => [...prev, newCat].sort((a, b) => a.name.localeCompare(b.name)));
+                const response = await createCategory({ name: newCategoryInput.trim() });
+                setCategories(prev => [...prev, response.data].sort((a, b) => a.name.localeCompare(b.name)));
                 setNewCategoryInput("");
-                toast.success("Category added");
+                toast.success(response.message || "Category added");
             } catch (err: any) {
                 toast.error(err.message || "Failed to add category");
             }
