@@ -265,7 +265,7 @@ export async function createCategory(categoryData) {
 
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to create category");
-  return data.data || data.category;
+  return data;
 }
 
 export async function deleteCategory(id) {
