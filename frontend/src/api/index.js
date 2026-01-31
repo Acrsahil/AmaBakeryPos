@@ -373,3 +373,75 @@ export async function deleteBranch(id) {
   if (!res.ok) throw new Error(data?.message || "Failed to delete branch");
   return data;
 }
+
+// Customer Management APIs
+export async function fetchCustomers() {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + "/api/customer/";
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to fetch customers");
+  return data.data; // The backend returns {success, count, data: [...]}
+}
+
+export async function createCustomer(customerData) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + "/api/customer/";
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(customerData),
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to create customer");
+  return data.data;
+}
+
+export async function updateCustomer(id, customerData) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + `/api/customer/${id}/`;
+
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(customerData),
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to update customer");
+  return data.data;
+}
+
+export async function deleteCustomer(id) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + `/api/customer/${id}/`;
+
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await safeJson(res);
+  // Some delete endpoints return 204 No Content, check status too
+  if (!res.ok) throw new Error(data?.message || "Failed to delete customer");
+  return data;
+}
