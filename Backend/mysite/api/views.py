@@ -7,12 +7,14 @@ from .serializer_dir.users_serializer import (
     ChangePasswordSerializer,
     CustomTokenObtainPairSerializer,
 )
+from .views_dir.branch_view import BranchViewClass
+from .views_dir.categorys_view import CategoryViewClass
+from .views_dir.customer_view import CustomerViewClass
 
 # custom
 from .views_dir.product_view import ProductViewClass
 from .views_dir.users_view import UserViewClass
-from .views_dir.categorys_view import CategoryViewClass
-from .views_dir.branch_view import BranchViewClass
+
 
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
@@ -41,3 +43,4 @@ UserView = UserViewClass
 ProductView = ProductViewClass
 CategoryView = CategoryViewClass
 BranchView = BranchViewClass
+CustomerView = CustomerViewClass

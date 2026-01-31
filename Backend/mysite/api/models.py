@@ -74,3 +74,19 @@ class Product(models.Model):
 
     class Meta:
         unique_together = ["name"]
+
+
+class Customer(models.Model):
+    name = models.CharField(max_length=100)
+    phone = models.CharField(max_length=15, blank=True)
+    email = models.EmailField(blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    date = models.DateTimeField(auto_now_add=True)
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="branch_customer",
+    )
+
+    def __str__(self):
+        return f"{self.name}"

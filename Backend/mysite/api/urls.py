@@ -13,4 +13,7 @@ urlpatterns = [
     ),
     path("branch/<int:id>/", views.BranchViewClass.as_view(), name="Branch_details"),
     path("branch/", views.BranchViewClass.as_view(), name="Branch"),
+
+    path("customer/<int:id>/", views.CustomerView.as_view(), name="customer_details"),
+    path("customer/", views.CustomerView.as_view(), name="customer"),
 ]
