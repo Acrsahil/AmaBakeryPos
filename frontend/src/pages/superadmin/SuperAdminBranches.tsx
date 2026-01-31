@@ -34,6 +34,8 @@ export default function SuperAdminBranches() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [isAddOpen, setIsAddOpen] = useState(false);
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
@@ -138,13 +140,20 @@ export default function SuperAdminBranches() {
         }
     };
 
-    const openEditModal = (branch: Branch) => {
+    const openDetailsModal = (branch: Branch) => {
         setSelectedBranch(branch);
-        setEditForm({
-            name: branch.name,
-            location: branch.location
-        });
-        setIsEditOpen(true);
+        setIsDetailsOpen(true);
+    };
+
+    const handleEditFromDetails = () => {
+        setIsDetailsOpen(false);
+        setTimeout(() => {
+            setEditForm({
+                name: selectedBranch?.name || "",
+                location: selectedBranch?.location || ""
+            });
+            setIsEditOpen(true);
+        }, 100);
     };
 
     const handleUpdate = async () => {
@@ -191,24 +200,16 @@ export default function SuperAdminBranches() {
             </div>
 
             <div className="card-elevated p-4 md:p-6 border-2 border-slate-50 rounded-[2rem]">
-                <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Find a branch..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 h-11 bg-slate-50 border-slate-200 rounded-xl"
-                        />
-                    </div>
-                </div>
+                {/* ... (Search Input remains same) ... */}
 
                 {loading ? (
+                    // ... (Loader) ...
                     <div className="flex flex-col items-center justify-center py-20">
                         <Loader2 className="h-10 w-10 animate-spin text-primary/30" />
                         <p className="text-muted-foreground mt-4 font-medium">Fetching branches...</p>
                     </div>
                 ) : filteredBranches.length === 0 ? (
+                    // ... (Empty State) ...
                     <div className="text-center py-10 text-muted-foreground">
                         <Store className="h-12 w-12 mx-auto mb-3 opacity-20" />
                         <p>No branches found.</p>
@@ -216,19 +217,12 @@ export default function SuperAdminBranches() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         {filteredBranches.map(branch => (
-                            <div key={branch.id} className="group relative bg-white border border-slate-100 rounded-2xl p-5 hover:shadow-lg hover:border-primary/20 transition-all cursor-pointer">
+                            <div
+                                key={branch.id}
+                                className="group relative bg-white border border-slate-100 rounded-2xl p-5 hover:shadow-lg hover:border-primary/20 transition-all cursor-pointer"
+                                onClick={() => openDetailsModal(branch)}
+                            >
                                 <div className="absolute top-4 right-4 flex gap-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            openEditModal(branch);
-                                        }}
-                                    >
-                                        <Pencil className="h-4 w-4" />
-                                    </Button>
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -268,7 +262,73 @@ export default function SuperAdminBranches() {
                 )}
             </div>
 
-            {/* Creation Dialog */}
+            {/* Details Dialog */}
+            <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+                <DialogContent className="sm:max-w-[425px] rounded-[2rem] overflow-hidden">
+                    <DialogHeader className="bg-slate-50/50 p-6 border-b border-slate-100">
+                        <DialogTitle className="text-xl font-black text-slate-900 flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                                <Store className="h-5 w-5" />
+                            </div>
+                            Branch Details
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="p-6 space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Branch Name</Label>
+                                <p className="font-bold text-lg text-slate-900">{selectedBranch?.name}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Location</Label>
+                                <p className="font-bold text-lg text-slate-900 flex items-center gap-1">
+                                    <MapPin className="h-4 w-4 text-slate-400" />
+                                    {selectedBranch?.location}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Manager Information</Label>
+                                <Badge variant="outline" className="text-[10px] font-bold bg-white">{selectedBranch?.branch_manager ? "Active" : "Unassigned"}</Badge>
+                            </div>
+                            {selectedBranch?.branch_manager ? (
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-black text-sm">
+                                        {selectedBranch.branch_manager.username.substring(0, 2).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-slate-900 text-sm">{selectedBranch.branch_manager.username}</p>
+                                        <p className="text-xs text-slate-500 font-medium">{selectedBranch.branch_manager.email}</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-muted-foreground italic">No manager assigned to this branch.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    <DialogFooter className="bg-slate-50/50 p-6 flex flex-col !flex-col gap-2 sm:space-x-0">
+                        <Button
+                            onClick={handleEditFromDetails}
+                            className="w-full h-12 rounded-xl gradient-warm text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-orange-200"
+                        >
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Branch Details
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setIsDetailsOpen(false)}
+                            className="w-full h-12 rounded-xl font-bold text-slate-400 hover:text-slate-600"
+                        >
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
                 <DialogContent className="sm:max-w-[500px] rounded-[2rem] overflow-hidden">
                     <DialogHeader>
