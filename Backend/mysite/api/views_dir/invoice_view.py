@@ -1,11 +1,11 @@
-from decimal import Decimal  
+from decimal import Decimal
 
 from django.db import transaction
-from rest_framework import status  
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import Invoice, Payment  
+from ..models import Invoice, Payment
 from ..serializer_dir.invoice_serializer import (
     InvoiceResponseSerializer,
     InvoiceSerializer,
@@ -70,7 +70,7 @@ class InvoiceViewClass(APIView):
         role = self.get_user_role(request.user)
 
         # Check permissions
-        if role not in ["ADMIN", "SUPER_ADMIN", "COUNTER", "WAITER"]:
+        if role not in ["ADMIN", "SUPER_ADMIN", "COUNTER", "WAITER", "BRANCH_MANAGER"]:
             return Response(
                 {"success": False, "error": "Permission denied"},
                 status=status.HTTP_403_FORBIDDEN,  # ✅ Use status constants
