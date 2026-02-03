@@ -23,7 +23,12 @@ class CustomUserAdmin(UserAdmin):
 
 @admin.register(Branch)
 class BranchAdmin(admin.ModelAdmin):
-    pass
+    list_display = (
+        "id",
+        "name",
+    )
+    list_filter = ("name", "id")
+    search_fields = ("name", "name")
 
 
 @admin.register(ProductCategory)
