@@ -33,7 +33,14 @@ class CategoryViewClass(APIView):
                 )
         else:
             # Get all categories for user's branch
-            if role in ["SUPER_ADMIN", "ADMIN", "BRANCH_MANAGER", "WAITER", "COUNTER"]:
+            if role in [
+                "SUPER_ADMIN",
+                "ADMIN",
+                "BRANCH_MANAGER",
+                "WAITER",
+                "COUNTER",
+                "KITCHEN",
+            ]:
                 if role == ["SUPER_ADMIN", "ADMIN"]:
                     categories = ProductCategory.objects.all()
                 else:

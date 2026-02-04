@@ -107,6 +107,12 @@ class Invoice(models.Model):
         ("CANCELLED", "Cancelled"),
     ]
 
+    ORDER_STATUS_CHOICES = [
+        ("PENDING", "Pending"),
+        ("READY", "Ready"),
+        ("CANCELLED", "Cancelled"),
+    ]
+
     # Basic Info
     branch = models.ForeignKey(
         Branch, on_delete=models.PROTECT, related_name="invoices"
@@ -141,6 +147,11 @@ class Invoice(models.Model):
     payment_status = models.CharField(
         max_length=10, choices=PAYMENT_STATUS_CHOICES, default="PENDING"
     )
+
+    order_status = models.CharField(
+        max_length=10, choices=ORDER_STATUS_CHOICES, default="PENDING"
+    )
+
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -205,10 +216,7 @@ class InvoiceItem(models.Model):
 
 # models.py
 class Payment(models.Model):
-    PAYMENT_METHOD_CHOICES = [
-        ("CASH", "Cash"),
-        ("CARD", "Card"),
-    ]
+    PAYMENT_METHOD_CHOICES = [("CASH", "Cash"), ("CARD", "Card")]
 
     invoice = models.ForeignKey(
         Invoice, on_delete=models.CASCADE, related_name="payments"
