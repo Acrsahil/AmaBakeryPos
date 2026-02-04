@@ -29,6 +29,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "discount",
             "paid_amount",  # ✅ ADD THIS TO THE FIELDS LIST!
             "items",
+            "invoice_status",
         ]
 
     def create(self, validated_data):
@@ -102,6 +103,7 @@ class InvoiceResponseSerializer(serializers.ModelSerializer):
             "due_amount",
             "payment_status",
             "is_active",
+            "invoice_status",
             "items",
         ]
 

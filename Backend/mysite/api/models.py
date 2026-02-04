@@ -107,7 +107,7 @@ class Invoice(models.Model):
         ("CANCELLED", "Cancelled"),
     ]
 
-    ORDER_STATUS_CHOICES = [
+    INVOICE_STATUS_CHOICES = [
         ("PENDING", "Pending"),
         ("READY", "Ready"),
         ("CANCELLED", "Cancelled"),
@@ -148,8 +148,8 @@ class Invoice(models.Model):
         max_length=10, choices=PAYMENT_STATUS_CHOICES, default="PENDING"
     )
 
-    order_status = models.CharField(
-        max_length=10, choices=ORDER_STATUS_CHOICES, default="PENDING"
+    invoice_status = models.CharField(
+        max_length=10, choices=INVOICE_STATUS_CHOICES, default="PENDING"
     )
 
     is_active = models.BooleanField(default=True)
