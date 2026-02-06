@@ -128,9 +128,7 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = "en-us"
 
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
 AUTH_USER_MODEL = "api.User"
 
@@ -139,6 +137,9 @@ AUTH_USER_MODEL = "api.User"
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+
+USE_TZ = True
+TIME_ZONE = "Asia/Kathmandu"
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
