@@ -2,7 +2,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Branch, Customer, Invoice, Product, ProductCategory, User
+from .models import Branch, Customer, Invoice, Payment, Product, ProductCategory, User
 
 
 @admin.register(User)
@@ -99,4 +99,17 @@ class InvoiceAdmin(admin.ModelAdmin):
             },
         ),
         ("Status", {"fields": ("payment_status", "invoice_status", "is_active")}),
+    )
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "invoice",
+        "amount",
+        "payment_method",
+        "notes",
+        "payment_date",
+        "received_by",
     )

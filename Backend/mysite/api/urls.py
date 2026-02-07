@@ -17,5 +17,7 @@ urlpatterns = [
     path("customer/", views.CustomerView.as_view(), name="customer"),
     path("invoice/", views.InvoiceViewClass.as_view(), name="Invoice_details"),
     path("invoice/<int:id>/", views.InvoiceViewClass.as_view(), name="Invoice"),
-    path("invoice/<int:invoice_id>/payments/", views.PaymentView.as_view()),
+    path("payments/", views.PaymentView.as_view(), name="payment-list"),
+    path( "invoice/<int:invoice_id>/payments/", views.PaymentView.as_view(), name="payment-by-invoice",),
+    path( "payments/<int:payment_id>/", views.PaymentView.as_view(), name="payment-detail"),
 ]

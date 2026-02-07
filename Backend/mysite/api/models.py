@@ -92,6 +92,13 @@ class Customer(models.Model):
         return f"{self.name}"
 
 
+class Table(models.Model):
+    branch = models.ForeignKey(
+        Branch, on_delete=models.CASCADE, related_name="table_branch"
+    )
+    is_free = models.BooleanField(default=False)
+
+
 class Invoice(models.Model):
     # Define choices
     INVOICE_TYPE_CHOICES = [
@@ -113,7 +120,9 @@ class Invoice(models.Model):
         ("COMPLETED", "Completed"),
         ("CANCELLED", "Cancelled"),
     ]
-
+    table = models.ForeignKey(
+        Table, on_delete=models.SET_NULL, null=True, related_name="table"
+    )
     # Basic Info
     branch = models.ForeignKey(
         Branch, on_delete=models.PROTECT, related_name="invoices"
@@ -214,9 +223,12 @@ class InvoiceItem(models.Model):
             return Decimal("0")
 
 
-# models.py
 class Payment(models.Model):
-    PAYMENT_METHOD_CHOICES = [("CASH", "Cash"), ("CARD", "Card")]
+    PAYMENT_METHOD_CHOICES = [
+        ("CASH", "Cash"),
+        ("CARD", "Card"),
+        ("ONLINE", "Online"),
+    ]
 
     invoice = models.ForeignKey(
         Invoice, on_delete=models.CASCADE, related_name="payments"
@@ -225,12 +237,21 @@ class Payment(models.Model):
     payment_method = models.CharField(
         max_length=20, choices=PAYMENT_METHOD_CHOICES, default="CASH"
     )
-    transaction_id = models.CharField(max_length=100, blank=True, null=True)
+
+    # FULL UUID (system transaction id)
+    transaction_id = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        db_index=True,
+    )
+
     notes = models.TextField(blank=True, null=True)
     payment_date = models.DateTimeField(default=timezone.now)
+
     received_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name="received_payments"
     )
 
     def __str__(self):
-        return f"Payment {self.amount} - {self.invoice.invoice_number}"
+        return f"Payment {self.amount} - {self.invoice.invoice_number}"  # models.py
