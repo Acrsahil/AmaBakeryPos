@@ -501,3 +501,20 @@ export async function updateInvoiceStatus(id, status) {
   if (!res.ok) throw new Error(data?.message || "Failed to update invoice status");
   return data.data;
 }
+export async function addPayment(invoiceId, paymentData) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + `/api/invoice/${invoiceId}/payments/`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(paymentData),
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to add payment");
+  return data;
+}

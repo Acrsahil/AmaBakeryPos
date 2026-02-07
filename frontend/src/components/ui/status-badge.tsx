@@ -1,13 +1,13 @@
 import { cn } from "@/lib/utils";
 
-type StatusType = 'available' | 'occupied' | 'order-in-progress' | 'payment-pending' | 'new' | 'preparing' | 'ready' | 'completed' | 'pending' | 'paid' | 'low' | 'ok';
+type StatusType = 'available' | 'occupied' | 'order-in-progress' | 'payment-pending' | 'new' | 'preparing' | 'ready' | 'completed' | 'pending' | 'paid' | 'partial' | 'unpaid' | 'low' | 'ok';
 
 interface StatusBadgeProps {
-  status: StatusType;
+  status: string;
   className?: string;
 }
 
-const statusConfig: Record<StatusType, { label: string; className: string }> = {
+const statusConfig: Record<string, { label: string; className: string }> = {
   available: {
     label: 'Available',
     className: 'bg-success/15 text-success border-success/30',
@@ -48,6 +48,14 @@ const statusConfig: Record<StatusType, { label: string; className: string }> = {
     label: 'Paid',
     className: 'bg-success/15 text-success border-success/30',
   },
+  partial: {
+    label: 'Partial',
+    className: 'bg-orange-50 text-orange-700 border-orange-200',
+  },
+  unpaid: {
+    label: 'Unpaid',
+    className: 'bg-destructive/15 text-destructive border-destructive/30',
+  },
   low: {
     label: 'Low Stock',
     className: 'bg-destructive/15 text-destructive border-destructive/30',
@@ -59,11 +67,15 @@ const statusConfig: Record<StatusType, { label: string; className: string }> = {
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const config = statusConfig[status];
+  const normStatus = status?.toLowerCase();
+  const config = statusConfig[normStatus] || {
+    label: status || 'Unknown',
+    className: 'bg-slate-50 text-slate-600 border-slate-200',
+  };
 
   return (
     <span className={cn(
-      "status-badge border",
+      "status-badge border px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
       config.className,
       className
     )}>

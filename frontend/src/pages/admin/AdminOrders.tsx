@@ -96,7 +96,6 @@ export default function AdminOrders() {
                 <th className="px-6 py-4 text-left font-medium text-muted-foreground">Date</th>
                 <th className="px-6 py-4 text-left font-medium text-muted-foreground">Status</th>
                 <th className="px-6 py-4 text-right font-medium text-muted-foreground">Amount</th>
-                <th className="px-6 py-4 text-center font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -110,27 +109,22 @@ export default function AdminOrders() {
                   </td>
                 </tr>
               ) : filteredOrders.map((order) => (
-                <tr key={order.id} className="border-t hover:bg-slate-50 transition-colors">
+                <tr
+                  key={order.id}
+                  className="border-t hover:bg-slate-50 transition-colors cursor-pointer"
+                  onClick={() => setSelectedOrder(order)}
+                >
                   <td className="px-6 py-4 font-medium">{order.invoice_number}</td>
                   <td className="px-6 py-4">{order.branch_name}</td>
                   <td className="px-6 py-4">{order.created_by_name}</td>
                   <td className="px-6 py-4">{order.customer_name || 'Walk-in'}</td>
                   <td className="px-6 py-4 text-muted-foreground text-sm">
-                    {format(parseISO(order.order_date), 'MMM d, h:mm a')}
+                    {order.order_date ? format(parseISO(order.order_date), 'MMM d, h:mm a') : 'N/A'}
                   </td>
                   <td className="px-6 py-4">
-                    <StatusBadge status={order.payment_status.toLowerCase()} />
+                    <StatusBadge status={(order.payment_status || 'unpaid').toLowerCase()} />
                   </td>
                   <td className="px-6 py-4 text-right font-semibold">Rs.{order.total_amount}</td>
-                  <td className="px-6 py-4 text-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setSelectedOrder(order)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -182,14 +176,17 @@ export default function AdminOrders() {
               <div className="border-t pt-4">
                 <p className="text-xs font-bold uppercase text-muted-foreground mb-2 tracking-widest">Items</p>
                 <div className="space-y-2">
-                  {selectedOrder.items.map((item: any, idx: number) => (
+                  {selectedOrder.items?.map((item: any, idx: number) => (
                     <div key={idx} className="flex justify-between text-sm">
                       <div className="flex flex-col text-left">
                         <span className="font-medium">{item.quantity}× Product #{item.product}</span>
                       </div>
-                      <span className="font-medium">Rs.{parseFloat(item.unit_price) * item.quantity}</span>
+                      <span className="font-medium">Rs.{(parseFloat(item.unit_price) * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
+                  {(!selectedOrder.items || selectedOrder.items.length === 0) && (
+                    <p className="text-xs text-muted-foreground italic">No items recorded</p>
+                  )}
                 </div>
               </div>
 
