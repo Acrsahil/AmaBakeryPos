@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { fetchBranches, createBranch, deleteBranch, createUser, updateBranch } from "../../api/index.js";
+import { fetchBranches, createBranch, deleteBranch, createUser, updateBranch, createTable } from "../../api/index.js";
 
 interface Branch {
     id: number;
@@ -43,6 +43,7 @@ export default function SuperAdminBranches() {
     const [form, setForm] = useState({
         name: "",
         location: "",
+        table_count: 1,
         showManager: false,
         manager_username: "",
         manager_full_name: "",
@@ -94,7 +95,13 @@ export default function SuperAdminBranches() {
 
             const newBranchId = branchRes.data.id;
 
-            // 2. Handle New Manager (Only if opted-in)
+            // 2. Create Tables
+            await createTable({
+                branch: newBranchId,
+                table_count: Number(form.table_count)
+            });
+
+            // 3. Handle New Manager (Only if opted-in)
             if (form.showManager) {
                 await createUser({
                     username: form.manager_username,
@@ -105,15 +112,16 @@ export default function SuperAdminBranches() {
                     branch: newBranchId,
                     password: "amabakery@123"
                 });
-                toast.success(`Branch created and new manager ${form.manager_username} registered`);
+                toast.success(`Branch created with ${form.table_count} tables and manager ${form.manager_username} registered`);
             } else {
-                toast.success("Branch created successfully (Stand-alone)");
+                toast.success(`Branch created successfully with ${form.table_count} tables`);
             }
 
             setIsAddOpen(false);
             setForm({
                 name: "",
                 location: "",
+                table_count: 1,
                 showManager: false,
                 manager_username: "",
                 manager_full_name: "",
@@ -359,6 +367,19 @@ export default function SuperAdminBranches() {
                                     className="h-12 rounded-xl border-slate-200 focus:ring-primary shadow-sm font-bold"
                                 />
                             </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="table_count" className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Initial Table Count</Label>
+                            <Input
+                                id="table_count"
+                                type="number"
+                                min="1"
+                                value={form.table_count}
+                                onChange={(e) => setForm(prev => ({ ...prev, table_count: parseInt(e.target.value) || 0 }))}
+                                placeholder="Enter number of tables"
+                                className="h-12 rounded-xl border-slate-200 focus:ring-primary shadow-sm font-bold"
+                            />
                         </div>
 
                         <div className="pt-2 border-t border-slate-100 mt-2">

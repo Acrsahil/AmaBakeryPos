@@ -518,3 +518,21 @@ export async function addPayment(invoiceId, paymentData) {
   if (!res.ok) throw new Error(data?.message || "Failed to add payment");
   return data;
 }
+
+export async function createTable(tableData) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + "/api/table/";
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(tableData),
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to create table");
+  return data;
+}
