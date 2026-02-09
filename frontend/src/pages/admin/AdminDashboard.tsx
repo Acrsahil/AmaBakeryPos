@@ -1,7 +1,9 @@
 import { StatCard } from "@/components/admin/StatCard";
 import { useState, useEffect } from "react";
-import { analyticsData, tables, branches, User } from "@/lib/mockData";
-import { fetchInvoices } from "@/api/index.js";
+import { NavLink } from "react-router-dom";
+import { analyticsData, branches, User } from "@/lib/mockData";
+import { fetchInvoices, fetchTables, patchTable } from "@/api/index.js";
+import { getCurrentUser } from "../../auth/auth";
 import { toast } from "sonner";
 import {
   DollarSign,
@@ -11,7 +13,8 @@ import {
   UtensilsCrossed,
   Coffee,
   MapPin,
-  Loader2
+  Loader2,
+  ExternalLink
 } from "lucide-react";
 import {
   BarChart,
@@ -30,17 +33,29 @@ import { StatusBadge } from "@/components/ui/status-badge";
 const COLORS = ['hsl(32, 95%, 44%)', 'hsl(15, 70%, 50%)', 'hsl(142, 71%, 45%)', 'hsl(199, 89%, 48%)'];
 
 export default function AdminDashboard() {
-  // Get current user and branch
-  const storedUser = localStorage.getItem('currentUser');
-  const user: User | null = storedUser ? JSON.parse(storedUser) : null;
-  const branch = branches.find(b => b.id === user?.branchId);
+  const user = getCurrentUser();
+  const branch = branches.find(b => b.id === user?.branch_id);
 
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tableCount, setTableCount] = useState<number>(0);
 
   useEffect(() => {
     loadRecentOrders();
-  }, []);
+    loadTableData();
+  }, [user?.branch_id]);
+
+  const loadTableData = async () => {
+    try {
+      const tablesData = await fetchTables();
+      const myBranchConfig = tablesData.find((t: any) => t.branch === user?.branch_id);
+      if (myBranchConfig) {
+        setTableCount(myBranchConfig.table_count || 0);
+      }
+    } catch (error) {
+      console.error("Failed to fetch tables:", error);
+    }
+  };
 
   const loadRecentOrders = async () => {
     setLoading(true);
@@ -56,9 +71,15 @@ export default function AdminDashboard() {
     }
   };
 
+  const generatedTables = Array.from({ length: tableCount }, (_, i) => ({
+    id: i + 1,
+    number: i + 1,
+    status: 'available'
+  }));
+
   const liveTableStatus = {
-    available: tables.filter(t => t.status === 'available').length,
-    occupied: tables.filter(t => t.status !== 'available').length,
+    available: tableCount,
+    occupied: 0,
   };
 
   return (
@@ -183,28 +204,23 @@ export default function AdminDashboard() {
         <div className="card-elevated p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Live Table Status</h3>
-            <UtensilsCrossed className="h-5 w-5 text-primary" />
-          </div>
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-success/10 rounded-lg p-4 text-center">
-              <p className="text-3xl font-bold text-success">{liveTableStatus.available}</p>
-              <p className="text-sm text-muted-foreground">Available</p>
+            <div className="flex items-center gap-2">
+              <NavLink
+                to="/admin/dashboard/tables"
+                className="p-1.5 hover:bg-primary/10 rounded-md text-primary transition-colors"
+                title="Go to Table Management"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </NavLink>
+              <UtensilsCrossed className="h-5 w-5 text-primary" />
             </div>
-            <div className="bg-warning/10 rounded-lg p-4 text-center">
-              <p className="text-3xl font-bold text-warning">{liveTableStatus.occupied}</p>
-              <p className="text-sm text-muted-foreground">Occupied</p>
-            </div>
           </div>
-          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
-            {tables.map((table) => (
+
+          <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+            {generatedTables.map((table) => (
               <div
                 key={table.id}
-                className={`aspect-square rounded-lg flex items-center justify-center text-sm font-medium ${table.status === 'available'
-                  ? 'bg-success/20 text-success'
-                  : table.status === 'payment-pending'
-                    ? 'bg-accent/20 text-accent'
-                    : 'bg-warning/20 text-warning'
-                  }`}
+                className="aspect-square rounded-md flex items-center justify-center text-[10px] sm:text-xs font-black bg-success/10 text-success border border-success/20 shadow-sm hover:border-success/40 transition-colors"
               >
                 {table.number}
               </div>

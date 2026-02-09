@@ -4,18 +4,19 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Card } from "@/components/ui/card";
-import { 
-  Store, 
-  Bell, 
-  Printer, 
-  CreditCard, 
+import {
+  Store,
+  Bell,
+  Printer,
+  CreditCard,
   Globe,
   Save
 } from "lucide-react";
 import { toast } from "sonner";
+import { getCurrentUser } from "../../auth/auth";
 
 export default function AdminSettings() {
-  const handleSave = () => {
+  const handleSave = async () => {
     toast.success("Settings saved successfully");
   };
 
@@ -44,7 +45,7 @@ export default function AdminSettings() {
             <p className="text-sm text-muted-foreground">Basic details about your restaurant</p>
           </div>
         </div>
-        
+
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <Label htmlFor="name">Restaurant Name</Label>
@@ -69,6 +70,7 @@ export default function AdminSettings() {
         </div>
       </Card>
 
+
       {/* Notifications */}
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-6">
@@ -80,7 +82,7 @@ export default function AdminSettings() {
             <p className="text-sm text-muted-foreground">Configure alert preferences</p>
           </div>
         </div>
-        
+
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -119,7 +121,7 @@ export default function AdminSettings() {
             <p className="text-sm text-muted-foreground">Configure KOT and bill printing</p>
           </div>
         </div>
-        
+
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -155,7 +157,7 @@ export default function AdminSettings() {
             <p className="text-sm text-muted-foreground">Configure accepted payment methods</p>
           </div>
         </div>
-        
+
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -194,7 +196,7 @@ export default function AdminSettings() {
             <p className="text-sm text-muted-foreground">Currency and language preferences</p>
           </div>
         </div>
-        
+
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <Label htmlFor="currency">Currency</Label>

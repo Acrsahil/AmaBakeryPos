@@ -32,6 +32,7 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminCustomers from "./pages/admin/AdminCustomers";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminTables from "./pages/admin/AdminTables";
 
 // Super Admin
 import SuperAdminLogin from "./pages/SuperAdminLogin";
@@ -208,6 +209,7 @@ const App = () => (
             <Route path="users" element={<AdminUsers />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="tables" element={<AdminTables />} />
           </Route>
 
           {/* Optional: redirect base role paths */}

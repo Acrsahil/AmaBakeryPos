@@ -536,3 +536,38 @@ export async function createTable(tableData) {
   if (!res.ok) throw new Error(data?.message || "Failed to create table");
   return data;
 }
+
+export async function fetchTables() {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + "/api/table/";
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to fetch tables");
+  return data.data; // Expected {success, data: [...]}
+}
+
+export async function patchTable(id, tableData) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + `/api/table/${id}/`;
+
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(tableData),
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to update table");
+  return data.data;
+}
