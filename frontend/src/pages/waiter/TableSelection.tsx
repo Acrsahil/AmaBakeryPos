@@ -5,6 +5,9 @@ import { TableCard } from "@/components/waiter/TableCard";
 import { WaiterBottomNav } from "@/components/waiter/WaiterBottomNav";
 import { tables, Table } from "@/lib/mockData";
 import { getAllOrders } from "@/lib/orderStorage";
+import { useEffect } from "react";
+import { fetchTables } from "@/api/index.js";
+import { getCurrentUser } from "../../auth/auth";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -12,8 +15,32 @@ import { Plus, Users } from "lucide-react";
 
 export default function TableSelection() {
   const navigate = useNavigate();
-  const [allTables] = useState<Table[]>(tables);
+  const [allTables, setAllTables] = useState<Table[]>([]);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+  const user = getCurrentUser();
+
+  useEffect(() => {
+    const loadTables = async () => {
+      try {
+        const branchTables = await fetchTables();
+        const myBranchConfig = branchTables.find((t: any) => t.branch === user?.branch_id);
+
+        if (myBranchConfig) {
+          const count = myBranchConfig.table_count || 0;
+          const generatedTables: Table[] = Array.from({ length: count }, (_, i) => ({
+            id: `table-${i + 1}`,
+            number: i + 1,
+            status: 'available',
+            capacity: 4
+          }));
+          setAllTables(generatedTables);
+        }
+      } catch (error) {
+        console.error("Failed to fetch tables:", error);
+      }
+    };
+    loadTables();
+  }, [user?.branch_id]);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
 
@@ -53,7 +80,7 @@ export default function TableSelection() {
 
     return {
       ...table,
-      status: isActuallyOccupied ? ('occupied' as const) : ('available' as const),
+      status: 'available' as const, // Always available as requested
       groups: combinedGroups
     };
   });
