@@ -40,7 +40,7 @@ import {
   Minus
 } from "lucide-react";
 import { toast } from "sonner";
-import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories } from "../../api/index.js";
+import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories, addItemActivity, fetchItemActivity } from "../../api/index.js";
 
 interface Product {
   id: number;
@@ -66,10 +66,12 @@ interface BackendCategory {
 
 interface ActivityLog {
   id: number;
-  type: "Add Stock" | "Remove Stock" | "Update" | "Initial";
-  date: string;
+  product: number;
+  product_detail: string;
+  types: "ADD_STOCK" | "REDUCE_STOCK" | "INITIAL_STOCK" | "UPDATE_STOCK";
   change: string;
   quantity: number;
+  created_at: string;
   remarks: string;
 }
 
@@ -85,12 +87,12 @@ export default function AdminInventory() {
   // Dialog States
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAdjustStockOpen, setIsAdjustStockOpen] = useState(false);
-  const [stockActionType, setStockActionType] = useState<"add" | "remove">("add");
+  const [stockActionType, setStockActionType] = useState<"add" | "reduce">("add");
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Mock Activity Log (In a real app, this would come from the backend)
-  const [activityLogs, setActivityLogs] = useState<Record<number, ActivityLog[]>>({});
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -116,6 +118,27 @@ export default function AdminInventory() {
       setLoading(false);
     }
   };
+
+  const loadActivity = async (productId: number) => {
+    setLoadingActivity(true);
+    try {
+      const data = await fetchItemActivity(productId);
+      setActivityLogs(data || []);
+    } catch (err: any) {
+      console.error("Failed to load activity:", err);
+      setActivityLogs([]);
+    } finally {
+      setLoadingActivity(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedProductId) {
+      loadActivity(selectedProductId);
+    } else {
+      setActivityLogs([]);
+    }
+  }, [selectedProductId]);
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -160,6 +183,9 @@ export default function AdminInventory() {
       }
       setIsDialogOpen(false);
       setEditProduct(null);
+      if (selectedProductId) {
+        loadActivity(selectedProductId);
+      }
     } catch (err: any) {
       toast.error(err.message || "Operation failed");
     } finally {
@@ -191,7 +217,7 @@ export default function AdminInventory() {
 
     setSubmitting(true);
     const formData = new FormData(e.currentTarget);
-    const type = formData.get("type") as "add" | "remove";
+    const type = formData.get("type") as "add" | "reduce";
     const quantity = parseInt(formData.get("quantity") as string);
     const remarks = formData.get("remarks") as string;
 
@@ -212,32 +238,22 @@ export default function AdminInventory() {
     }
 
     try {
-      // Create a proper payload that includes all required fields
-      // Since the generic update API might require all fields, we construct the full object
-      const payload = {
-        name: selectedProduct.name,
-        cost_price: selectedProduct.cost_price,
-        selling_price: selectedProduct.selling_price,
-        product_quantity: newQuantity,
-        low_stock_bar: selectedProduct.low_stock_bar,
-        category: selectedProduct.category,
-        is_available: selectedProduct.is_available
-      };
+      const res = await addItemActivity(selectedProduct.id, stockActionType, {
+        change: quantity,
+        remarks: remarks || ""
+      });
 
-      const updated = await updateProduct(selectedProduct.id, payload);
-      setProducts(prev => prev.map(p => p.id === selectedProduct.id ? updated : p));
+      if (res.success) {
+        // Update product quantity in local state
+        const updatedQuantity = res.data.quantity;
+        setProducts(prev => prev.map(p => p.id === selectedProduct.id ? { ...p, product_quantity: updatedQuantity } : p));
 
-      // Log Activity
-      addActivity(
-        selectedProduct.id,
-        type === "add" ? "Add Stock" : "Remove Stock",
-        type === "add" ? `+${quantity}` : `-${quantity}`,
-        newQuantity,
-        remarks || "Manual Adjustment"
-      );
+        // Refresh activity logs
+        loadActivity(selectedProduct.id);
 
-      toast.success("Stock adjusted successfully");
-      setIsAdjustStockOpen(false);
+        toast.success(res.message || "Stock adjusted successfully");
+        setIsAdjustStockOpen(false);
+      }
     } catch (err: any) {
       toast.error(err.message || "Stock adjustment failed");
     } finally {
@@ -245,22 +261,8 @@ export default function AdminInventory() {
     }
   };
 
-  const addActivity = (productId: number, type: any, change: string, quantity: number, remarks: string) => {
-    setActivityLogs(prev => {
-      const logs = prev[productId] || [];
-      const newLog: ActivityLog = {
-        id: Date.now(),
-        type,
-        date: new Date().toISOString().split('T')[0],
-        change,
-        quantity,
-        remarks
-      };
-      return { ...prev, [productId]: [newLog, ...logs] };
-    });
-  };
 
-  const currentActivity = selectedProductId ? (activityLogs[selectedProductId] || []) : [];
+  const currentActivity = activityLogs;
 
   const stockValue = selectedProduct
     ? (selectedProduct.product_quantity * parseFloat(selectedProduct.cost_price)).toFixed(2)
@@ -465,12 +467,12 @@ export default function AdminInventory() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {
-                          setStockActionType("remove");
+                          setStockActionType("reduce");
                           setIsAdjustStockOpen(true);
                         }}
                         className="font-bold text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer"
                       >
-                        <Minus className="h-3 w-3 mr-2" /> Remove Stock
+                        <Minus className="h-3 w-3 mr-2" /> Reduce Stock
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -487,7 +489,7 @@ export default function AdminInventory() {
                           ) : (
                             <div className="flex items-center text-red-600 gap-2">
                               <div className="p-2 bg-red-100 rounded-lg"><Minus className="h-5 w-5" /></div>
-                              Remove Stock
+                              Reduce Stock
                             </div>
                           )}
                         </DialogTitle>
@@ -502,7 +504,7 @@ export default function AdminInventory() {
 
                         <div className="space-y-2">
                           <Label className="text-xs font-bold uppercase text-slate-400">
-                            Quantity to {stockActionType === "add" ? "Add" : "Remove"}
+                            Quantity to {stockActionType === "add" ? "Add" : "Reduce"}
                           </Label>
                           <Input name="quantity" type="number" min="1" className="h-12 rounded-xl bg-slate-50 border-slate-200 text-lg font-bold" placeholder="0" required />
                         </div>
@@ -515,7 +517,7 @@ export default function AdminInventory() {
                           className={`w-full h-12 rounded-xl font-bold mt-2 ${stockActionType === 'add' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
                           disabled={submitting}
                         >
-                          {submitting ? <Loader2 className="animate-spin" /> : (stockActionType === 'add' ? "Confirm Addition" : "Confirm Removal")}
+                          {submitting ? <Loader2 className="animate-spin" /> : (stockActionType === 'add' ? "Confirm Addition" : "Confirm Reduction")}
                         </Button>
                       </form>
                     </DialogContent>
@@ -535,20 +537,35 @@ export default function AdminInventory() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {currentActivity.length === 0 ? (
+                    {loadingActivity ? (
                       <tr>
                         <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-400">
-                          No activity logs found for this session.
+                          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                          Loading history...
+                        </td>
+                      </tr>
+                    ) : currentActivity.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-400">
+                          No history found for this product.
                         </td>
                       </tr>
                     ) : (
                       currentActivity.map(log => (
                         <tr key={log.id} className="hover:bg-slate-50">
-                          <td className="px-6 py-4 text-sm font-bold text-slate-700">{log.type}</td>
-                          <td className="px-6 py-4 text-sm text-slate-500 font-medium">{log.date}</td>
-                          <td className={`px-6 py-4 text-sm font-bold ${log.change.startsWith('+') ? 'text-emerald-500' : 'text-red-500'}`}>{log.change}</td>
+                          <td className="px-6 py-4 text-sm font-bold text-slate-700">
+                            {log.types === "ADD_STOCK" ? "Add Stock" :
+                              log.types === "REDUCE_STOCK" ? "Reduce Stock" :
+                                log.types === "INITIAL_STOCK" ? "Opening Stock" : "Update"}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-500 font-medium">
+                            {new Date(log.created_at).toLocaleString()}
+                          </td>
+                          <td className={`px-6 py-4 text-sm font-bold ${log.types.includes('ADD') ? 'text-emerald-500' : 'text-red-500'}`}>
+                            {log.types.includes('ADD') ? `+${log.change}` : `-${log.change}`}
+                          </td>
                           <td className="px-6 py-4 text-sm text-slate-700 font-bold">{log.quantity}</td>
-                          <td className="px-6 py-4 text-sm text-slate-500">{log.remarks}</td>
+                          <td className="px-6 py-4 text-sm text-slate-500">{log.remarks || "-"}</td>
                         </tr>
                       ))
                     )}

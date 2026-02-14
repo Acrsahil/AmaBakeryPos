@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { fetchBranches, createBranch, deleteBranch, createUser, updateBranch, createTable } from "../../api/index.js";
+import { fetchBranches, createBranch, deleteBranch, createUser, updateBranch, createTable, fetchTables } from "../../api/index.js";
 
 interface Branch {
     id: number;
@@ -27,6 +27,7 @@ interface Branch {
         total_user: number;
     } | null;
     revenue?: number;
+    total_tables?: number;
 }
 
 export default function SuperAdminBranches() {
@@ -63,8 +64,23 @@ export default function SuperAdminBranches() {
     const loadBranches = async () => {
         setLoading(true);
         try {
-            const response = await fetchBranches();
-            setBranches(response.data || []);
+            const [branchRes, tableRes] = await Promise.all([
+                fetchBranches(),
+                fetchTables()
+            ]);
+
+            const branchesData = branchRes.data || [];
+            const tablesData = tableRes || [];
+
+            const merged = branchesData.map((b: Branch) => {
+                const tableInfo = tablesData.find((t: any) => t.branch === b.id);
+                return {
+                    ...b,
+                    total_tables: tableInfo ? tableInfo.table_count : 0
+                };
+            });
+
+            setBranches(merged);
         } catch (err: any) {
             toast.error(err.message || "Failed to load branches");
         } finally {
@@ -208,7 +224,15 @@ export default function SuperAdminBranches() {
             </div>
 
             <div className="card-elevated p-4 md:p-6 border-2 border-slate-50 rounded-[2rem]">
-                {/* ... (Search Input remains same) ... */}
+                <div className="relative mb-6">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    <Input
+                        placeholder="Search branches by name or location..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="h-14 pl-12 pr-4 rounded-2xl bg-slate-50/50 border-slate-100 focus:bg-white focus:ring-primary shadow-sm text-lg font-medium"
+                    />
+                </div>
 
                 {loading ? (
                     // ... (Loader) ...
@@ -254,13 +278,17 @@ export default function SuperAdminBranches() {
                                     {branch.location}
                                 </div>
 
-                                <div className="flex items-center justify-between text-sm py-3 border-t border-slate-50">
+                                <div className="grid grid-cols-3 gap-2 items-center text-sm py-3 border-t border-slate-50">
                                     <div>
-                                        <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Manager</p>
-                                        <p className="font-semibold text-slate-700">{branch.branch_manager?.username || "N/A"}</p>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Manager</p>
+                                        <p className="font-semibold text-slate-700 truncate">{branch.branch_manager?.username || "N/A"}</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Tables</p>
+                                        <p className="font-bold text-primary">{branch.total_tables || 0}</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Staff Count</p>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Staff</p>
                                         <p className="font-semibold text-slate-700">{branch.branch_manager?.total_user || 0}</p>
                                     </div>
                                 </div>
@@ -283,17 +311,21 @@ export default function SuperAdminBranches() {
                     </DialogHeader>
 
                     <div className="p-6 space-y-6">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-1">
                                 <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Branch Name</Label>
-                                <p className="font-bold text-lg text-slate-900">{selectedBranch?.name}</p>
+                                <p className="font-bold text-base text-slate-900">{selectedBranch?.name}</p>
                             </div>
                             <div className="space-y-1">
                                 <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Location</Label>
-                                <p className="font-bold text-lg text-slate-900 flex items-center gap-1">
-                                    <MapPin className="h-4 w-4 text-slate-400" />
+                                <p className="font-bold text-base text-slate-900 flex items-center gap-1">
+                                    <MapPin className="h-3 w-3 text-slate-400" />
                                     {selectedBranch?.location}
                                 </p>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Tables</Label>
+                                <p className="font-black text-xl text-primary">{selectedBranch?.total_tables || 0}</p>
                             </div>
                         </div>
 
