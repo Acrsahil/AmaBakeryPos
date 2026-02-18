@@ -3,18 +3,40 @@ import { useNavigate } from "react-router-dom";
 import { OrderCard } from "@/components/kitchen/OrderCard";
 import { branches, User } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
-import { ChefHat, LogOut, Bell, CheckCircle2, Clock, RotateCcw, MapPin, Utensils, Coffee, Loader2 } from "lucide-react";
+import {
+  ChefHat,
+  LogOut,
+  Bell,
+  CheckCircle2,
+  Clock,
+  RotateCcw,
+  MapPin,
+  Utensils,
+  Coffee,
+  Loader2,
+  Layers,
+  ChevronDown
+} from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { logout } from "../../auth/auth";
-import { fetchInvoices, fetchProducts, fetchCategories, updateInvoiceStatus } from "../../api/index.js";
-
+import { fetchInvoices, fetchProducts, fetchCategories, updateInvoiceStatus, fetchTables } from "../../api/index.js";
 
 export default function KitchenDisplay() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [floors, setFloors] = useState<any[]>([]);
+  const [selectedFloorId, setSelectedFloorId] = useState<number | 'all'>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,14 +46,16 @@ export default function KitchenDisplay() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [invoiceData, productData, categoryData] = await Promise.all([
+      const [invoiceData, productData, categoryData, floorData] = await Promise.all([
         fetchInvoices(),
         fetchProducts(),
-        fetchCategories()
+        fetchCategories(),
+        fetchTables()
       ]);
 
       setProducts(productData || []);
       setCategories(categoryData || []);
+      setFloors(floorData || []);
 
       const productsMap = (productData || []).reduce((acc: any, p: any) => {
         if (p && p.id) {
@@ -44,9 +68,9 @@ export default function KitchenDisplay() {
         .filter((inv: any) => inv && inv.is_active && (inv.invoice_status === 'PENDING' || inv.invoice_status === 'READY'))
         .map((inv: any) => {
           // Extract table and group from description "Table 1 - Group A"
-          const tableMatch = (inv.invoice_description || "").match(/Table (\d+)/);
+          const tableMatch = (inv.description || inv.invoice_description || "").match(/Table (\d+)/);
           const tableNumber = tableMatch ? parseInt(tableMatch[1]) : 0;
-          const groupName = (inv.invoice_description || "").split(" - ")[1] || "Sale";
+          const groupName = (inv.description || inv.invoice_description || "").split(" - ")[1] || "Sale";
 
           return {
             id: (inv.id || "").toString(),
@@ -55,6 +79,8 @@ export default function KitchenDisplay() {
             groupName,
             waiter: inv.created_by_name || "Unknown",
             createdAt: inv.order_date ? new Date(inv.order_date) : new Date(),
+            floor: inv.floor,
+            floorName: inv.floor_name,
             status: inv.invoice_status === 'PENDING' ? 'new' :
               inv.invoice_status === 'READY' ? 'ready' : 'completed',
             total: parseFloat(inv.total_amount || "0"),
@@ -91,29 +117,35 @@ export default function KitchenDisplay() {
   const isBreakfastKitchen = kitchenType === 'breakfast';
 
   // Filter Orders Logic
-  const filteredOrders = (orders || []).map(order => {
-    if (!order || !order.items) return null;
+  const filteredOrders = (orders || [])
+    .filter(order => {
+      if (selectedFloorId === 'all') return true;
+      return order.floor === selectedFloorId;
+    })
+    .map(order => {
+      if (!order || !order.items) return null;
 
-    // Filter items based on category
-    const relevantItems = order.items.filter((item: any) => {
-      if (!item || !item.menuItem) return false;
+      // Filter items based on category
+      const relevantItems = order.items.filter((item: any) => {
+        if (!item || !item.menuItem) return false;
 
-      // Find the category object for this item
-      const itemCat = (categories || []).find(c => c && c.name === item.menuItem.category);
-      const kitchenTarget = isBreakfastKitchen ? 'breakfast' : 'main';
+        // Find the category object for this item
+        const itemCat = (categories || []).find(c => c && c.name === item.menuItem.category);
+        const kitchenTarget = isBreakfastKitchen ? 'breakfast' : 'main';
 
-      // If categories are empty or category has no type, default to 'main'
-      const catType = itemCat?.type || 'main';
+        // If categories are empty or category has no type, default to 'main'
+        const catType = itemCat?.type || 'main';
 
-      return catType === kitchenTarget;
-    });
+        return catType === kitchenTarget;
+      });
 
-    // Return order with ONLY relevant items, or null if no items match
-    if (relevantItems.length > 0) {
-      return { ...order, items: relevantItems };
-    }
-    return null;
-  }).filter(Boolean);
+      // Return order with ONLY relevant items, or null if no items match
+      if (relevantItems.length > 0) {
+        return { ...order, items: relevantItems };
+      }
+      return null;
+    })
+    .filter(Boolean);
 
   const handleStatusChange = async (orderId: string, newFrontendStatus: string) => {
     // Map frontend status to backend status
@@ -138,102 +170,152 @@ export default function KitchenDisplay() {
     }
   };
 
+  const selectedFloorName = selectedFloorId === 'all' ? 'All Floors' : floors.find(f => f.id === selectedFloorId)?.name || 'Unknown Floor';
+
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
       {/* Header */}
       <header className="flex-none bg-white border-b px-6 py-4 shadow-sm z-10">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${isBreakfastKitchen ? 'bg-orange-100 text-orange-600' : 'bg-primary/10 text-primary'}`}>
-              {isBreakfastKitchen ? <Utensils className="h-6 w-6" /> : <Coffee className="h-6 w-6" />}
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${isBreakfastKitchen ? 'bg-orange-100 text-orange-600' : 'bg-primary/10 text-primary'}`}>
+                {isBreakfastKitchen ? <Utensils className="h-6 w-6" /> : <Coffee className="h-6 w-6" />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h1 className="text-xl font-bold text-foreground">
+                    {isBreakfastKitchen ? 'Breakfast Kitchen' : 'Main Kitchen'}
+                  </h1>
+                  <div className="bg-primary/5 text-primary text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-primary/10 flex items-center gap-1">
+                    <MapPin className="h-2 w-2" />
+                    {branch?.name || "Global"}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Live Feed • {user?.name || "Chef"}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-0.5">
-                <h1 className="text-xl font-bold text-foreground">
-                  {isBreakfastKitchen ? 'Breakfast Kitchen' : 'Main Kitchen'}
-                </h1>
-                <div className="bg-primary/5 text-primary text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-primary/10 flex items-center gap-1">
-                  <MapPin className="h-2 w-2" />
-                  {branch?.name || "Global"}
-                </div>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Feed • {user?.name || "Chef"}
-                </div>
-                <div className="h-3 w-px bg-slate-200" />
 
-                {/* Completed Orders Sheet */}
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-0.5 rounded-full cursor-pointer hover:bg-slate-200 transition-colors">
-                      <span className="text-xs font-medium text-slate-500">Completed today:</span>
-                      <span className="text-xs font-bold text-slate-700">{filteredOrders.filter(o => o.status === 'completed').length}</span>
+            <div className="h-10 w-px bg-slate-200" />
+
+            {/* Floor Filter Dropdown */}
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Filter:</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="h-10 px-4 rounded-xl border-slate-200 bg-slate-50/50 hover:bg-white transition-all gap-3 font-bold text-slate-700 min-w-[140px] justify-between">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-3.5 w-3.5 text-primary opacity-60" />
+                      {selectedFloorName}
                     </div>
-                  </SheetTrigger>
-                  <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
-                    <SheetHeader className="mb-6">
-                      <SheetTitle className="flex items-center gap-2">
-                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                        Completed Orders History
-                      </SheetTitle>
-                    </SheetHeader>
-
-                    <div className="space-y-4">
-                      {filteredOrders.filter(o => o.status === 'completed').length === 0 ? (
-                        <div className="text-center py-12 text-slate-400">
-                          <Clock className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                          <p>No completed orders yet today</p>
-                        </div>
-                      ) : (
-                        filteredOrders
-                          .filter(o => o.status === 'completed')
-                          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                          .map(order => (
-                            <div key={order.id} className="bg-slate-50 rounded-lg p-4 border border-slate-100">
-                              <div className="flex justify-between items-start mb-3">
-                                <div>
-                                  <h3 className="font-bold text-slate-800">Order #{order.id.slice(-3)}</h3>
-                                  <p className="text-sm text-slate-500">Table {order.tableNumber} • {order.waiter}</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-medium text-slate-400 bg-white px-2 py-1 rounded border border-slate-100">
-                                    {new Date(order.createdAt).toLocaleTimeString()}
-                                  </span>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-slate-400 hover:text-amber-600"
-                                    onClick={() => handleStatusChange(order.id, 'ready')}
-                                    title="Undo Completion"
-                                  >
-                                    <RotateCcw className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-
-                              <div className="space-y-1">
-                                {order.items.map((item, idx) => (
-                                  <div key={idx} className="flex gap-2 text-sm">
-                                    <span className="font-bold text-slate-600 w-4">{item.quantity}x</span>
-                                    <span className="text-slate-700 flex-1">{item.menuItem.name}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))
+                    <ChevronDown className="h-4 w-4 opacity-40" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-[200px] rounded-xl p-2">
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-widest font-black text-slate-400 px-3 py-2">Select Floor</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="h-10 rounded-lg cursor-pointer font-bold" onClick={() => setSelectedFloorId('all')}>
+                    All Floors
+                  </DropdownMenuItem>
+                  {floors.map((floor) => (
+                    <DropdownMenuItem
+                      key={floor.id}
+                      className="h-10 rounded-lg cursor-pointer font-bold flex items-center justify-between"
+                      onClick={() => setSelectedFloorId(floor.id)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-3.5 w-3.5 opacity-40" />
+                        {floor.name}
+                      </div>
+                      {orders.filter(o => o.floor === floor.id).length > 0 && (
+                        <span className="bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-full">
+                          {orders.filter(o => o.floor === floor.id).length}
+                        </span>
                       )}
-                    </div>
-                  </SheetContent>
-                </Sheet>
-              </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={logout} className="gap-2 font-bold text-xs uppercase tracking-widest h-9 rounded-xl border-slate-200">
-            <LogOut className="h-3.5 w-3.5" />
-            Sign Out
-          </Button>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
+              {/* Completed Orders Sheet */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <div className="flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-full cursor-pointer hover:bg-slate-200 transition-colors">
+                    <span className="text-xs font-medium text-slate-500">Completed today:</span>
+                    <span className="text-xs font-bold text-slate-700">{filteredOrders.filter(o => o.status === 'completed').length}</span>
+                  </div>
+                </SheetTrigger>
+                <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+                  <SheetHeader className="mb-6">
+                    <SheetTitle className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                      Completed Orders History
+                    </SheetTitle>
+                  </SheetHeader>
+
+                  <div className="space-y-4">
+                    {filteredOrders.filter(o => o.status === 'completed').length === 0 ? (
+                      <div className="text-center py-12 text-slate-400">
+                        <Clock className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                        <p>No completed orders yet today</p>
+                      </div>
+                    ) : (
+                      filteredOrders
+                        .filter(o => o.status === 'completed')
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .map(order => (
+                          <div key={order.id} className="bg-slate-50 rounded-lg p-4 border border-slate-100">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h3 className="font-bold text-slate-800">Order #{order.id.slice(-3)}</h3>
+                                <p className="text-sm text-slate-500">Table {order.tableNumber} • {order.waiter}</p>
+                                {order.floorName && <p className="text-[10px] font-black text-primary uppercase">{order.floorName}</p>}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-slate-400 bg-white px-2 py-1 rounded border border-slate-100">
+                                  {new Date(order.createdAt).toLocaleTimeString()}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-slate-400 hover:text-amber-600"
+                                  onClick={() => handleStatusChange(order.id, 'ready')}
+                                  title="Undo Completion"
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              {order.items.map((item, idx) => (
+                                <div key={idx} className="flex gap-2 text-sm">
+                                  <span className="font-bold text-slate-600 w-4">{item.quantity}x</span>
+                                  <span className="text-slate-700 flex-1">{item.menuItem.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+            <Button variant="outline" size="sm" onClick={logout} className="gap-2 font-bold text-xs uppercase tracking-widest h-9 rounded-xl border-slate-200">
+              <LogOut className="h-3.5 w-3.5" />
+              Sign Out
+            </Button>
+          </div>
         </div>
       </header>
 

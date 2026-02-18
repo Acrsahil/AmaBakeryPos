@@ -572,6 +572,25 @@ export async function patchTable(id, tableData) {
   return data.data;
 }
 
+export async function deleteTable(id) {
+  const token = localStorage.getItem("access");
+  const url = apiBaseUrl + `/api/floor/${id}/`;
+
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const data = await safeJson(res);
+    throw new Error(data?.message || "Failed to delete table");
+  }
+  return true;
+}
+
 // Item Activity & Stock Management
 export async function addItemActivity(productId, type, activityData) {
   const token = localStorage.getItem("access");

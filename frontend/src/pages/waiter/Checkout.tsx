@@ -101,6 +101,7 @@ export default function Checkout() {
                 invoice_type: "SALE",
                 notes: specialInstructions,
                 invoice_description: `Table ${state?.tableNumber} - ${state?.groupName || "Walk-in"}`,
+                floor: state?.floorId ? parseInt(state.floorId) : null,
                 tax_amount: taxAmount,
                 discount: discountAmount,
                 paid_amount: paidAmount,

@@ -1,46 +1,61 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { TableCard } from "@/components/waiter/TableCard";
 import { WaiterBottomNav } from "@/components/waiter/WaiterBottomNav";
-import { tables, Table } from "@/lib/mockData";
+import { Table } from "@/lib/mockData";
 import { getAllOrders } from "@/lib/orderStorage";
-import { useEffect } from "react";
 import { fetchTables } from "@/api/index.js";
 import { getCurrentUser } from "../../auth/auth";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Plus, Users } from "lucide-react";
+import { Plus, Users, Layers, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function TableSelection() {
   const navigate = useNavigate();
   const [allTables, setAllTables] = useState<Table[]>([]);
+  const [floors, setFloors] = useState<any[]>([]);
+  const [selectedFloor, setSelectedFloor] = useState<any>(null);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const user = getCurrentUser();
 
   useEffect(() => {
-    const loadTables = async () => {
+    const loadInitialData = async () => {
       try {
-        const branchTables = await fetchTables();
-        const myBranchConfig = branchTables.find((t: any) => t.branch === user?.branch_id);
-
-        if (myBranchConfig) {
-          const count = myBranchConfig.table_count || 0;
-          const generatedTables: Table[] = Array.from({ length: count }, (_, i) => ({
-            id: `table-${i + 1}`,
-            number: i + 1,
-            status: 'available',
-            capacity: 4
-          }));
-          setAllTables(generatedTables);
+        const branchFloors = await fetchTables();
+        setFloors(branchFloors || []);
+        if (branchFloors && branchFloors.length > 0) {
+          setSelectedFloor(branchFloors[0]);
         }
       } catch (error) {
-        console.error("Failed to fetch tables:", error);
+        console.error("Failed to fetch floors:", error);
       }
     };
-    loadTables();
+    loadInitialData();
   }, [user?.branch_id]);
+
+  useEffect(() => {
+    if (selectedFloor) {
+      const count = selectedFloor.table_count || 0;
+      const generatedTables: Table[] = Array.from({ length: count }, (_, i) => ({
+        id: `table-${selectedFloor.id}-${i + 1}`,
+        number: i + 1,
+        status: 'available',
+        capacity: 4
+      }));
+      setAllTables(generatedTables);
+    }
+  }, [selectedFloor]);
+
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
 
@@ -48,7 +63,9 @@ export default function TableSelection() {
   const activeOrders = getAllOrders();
 
   const tablesWithOrders = allTables.map(table => {
-    // Find all active orders for this table in localStorage
+    // Find all active orders for this table on THIS floor in localStorage
+    // Note: orderStorage might need floor awareness, but for now we'll match by table number
+    // In a real app, we'd prefix with floorId
     const tableOrders = activeOrders.filter(o => o.tableNumber === table.number.toString());
 
     // Create virtual groups based on active orders
@@ -58,7 +75,7 @@ export default function TableSelection() {
       orders: []
     }));
 
-    // Merge static groups (from mockData) with dynamic ones
+    // Merge static groups with dynamic ones
     const combinedGroups = [...(table.groups || [])];
     dynamicGroups.forEach(dg => {
       if (!combinedGroups.find(cg => cg.name === dg.name)) {
@@ -66,10 +83,9 @@ export default function TableSelection() {
       }
     });
 
-    // A table is occupied if it has active orders in storage OR if mockData says so
+    // A table is occupied if it has active orders in storage
     const isActuallyOccupied = tableOrders.length > 0 || table.status !== 'available';
 
-    // Ensure every occupied table has at least one group (Group A) for visual consistency
     if (isActuallyOccupied && combinedGroups.length === 0) {
       combinedGroups.push({
         id: `default-${table.number}-A`,
@@ -80,30 +96,27 @@ export default function TableSelection() {
 
     return {
       ...table,
-      status: 'available' as const, // Always available as requested
+      status: 'available' as const,
       groups: combinedGroups
     };
   });
 
   const handleTableClick = (table: Table) => {
-    // Look up the "live" version of the table
     const tableWithOrders = tablesWithOrders.find(t => t.id === table.id) || table;
     setSelectedTable(tableWithOrders);
 
     if (tableWithOrders.status === 'available') {
-      // New table: Start with Group A by default as requested
-      navigate(`/waiter/order/${tableWithOrders.number}?group=Group A`);
+      navigate(`/waiter/order/${tableWithOrders.number}?group=Group A&floorId=${selectedFloor.id}`);
     } else {
-      // Occupied table: Show selection dialog for groups
       setShowGroupDialog(true);
     }
   };
 
   const handleSelectGroup = (groupName?: string) => {
-    if (selectedTable) {
+    if (selectedTable && selectedFloor) {
       const path = groupName
-        ? `/waiter/order/${selectedTable.number}?group=${encodeURIComponent(groupName)}`
-        : `/waiter/order/${selectedTable.number}`;
+        ? `/waiter/order/${selectedTable.number}?group=${encodeURIComponent(groupName)}&floorId=${selectedFloor.id}`
+        : `/waiter/order/${selectedTable.number}?floorId=${selectedFloor.id}`;
       navigate(path);
     }
     setShowGroupDialog(false);
@@ -120,64 +133,121 @@ export default function TableSelection() {
     <div className="min-h-screen bg-slate-50/50 pb-20">
       <MobileHeader title="Select Table" notificationCount={2} />
 
-      <main className="p-4 max-w-2xl mx-auto pt-2">
+      <main className="p-4 max-w-2xl mx-auto pt-2 space-y-4">
+        {/* Floor Selection */}
+        <div className="flex items-center gap-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full justify-between h-14 rounded-2xl border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition-all font-bold">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Layers className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black mb-0.5">Current Floor</p>
+                    <p className="text-slate-700">{selectedFloor?.name || "Loading..."}</p>
+                  </div>
+                </div>
+                <ChevronDown className="h-4 w-4 text-slate-400" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-[calc(100vw-2rem)] max-w-2xl rounded-2xl p-2">
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-widest font-black text-slate-400 px-3 py-2">Switch Floor</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {floors.map((floor) => (
+                <DropdownMenuItem
+                  key={floor.id}
+                  className="h-12 rounded-xl focus:bg-primary/10 focus:text-primary transition-colors cursor-pointer"
+                  onClick={() => setSelectedFloor(floor)}
+                >
+                  <Layers className="h-4 w-4 mr-3 opacity-50" />
+                  <span className="font-bold">{floor.name}</span>
+                  <span className="ml-auto text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-black uppercase">
+                    {floor.table_count} Tables
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
         {/* Table List (Row-wise) */}
         <div className="space-y-1">
-          {tablesWithOrders.map((table) => (
-            <TableCard
-              key={table.id}
-              table={table}
-              onClick={handleTableClick}
-            />
-          ))}
+          {tablesWithOrders.length === 0 ? (
+            <div className="text-center py-12 text-slate-400">
+              <Layers className="h-12 w-12 mx-auto mb-3 opacity-20" />
+              <p>No tables found on this floor</p>
+            </div>
+          ) : (
+            tablesWithOrders.map((table) => (
+              <TableCard
+                key={table.id}
+                table={table}
+                onClick={handleTableClick}
+              />
+            ))
+          )}
         </div>
       </main>
 
       {/* Group Selection Dialog */}
       <Dialog open={showGroupDialog} onOpenChange={setShowGroupDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              Table {selectedTable?.number} Groups
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-sm rounded-[2rem] border-none shadow-2xl p-0 overflow-hidden">
+          <div className="bg-primary p-6 text-white">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3 text-white">
+                <Users className="h-6 w-6" />
+                <div className="text-left">
+                  <p className="text-[10px] uppercase tracking-widest font-black text-white/60 mb-0.5">Table {selectedTable?.number}</p>
+                  <p className="text-xl font-black">Select Group</p>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+          </div>
 
-          <div className="space-y-3">
-            {/* Consolidated Groups List */}
+          <div className="p-6 space-y-4">
+            <div className="space-y-2">
+              {(!selectedTable?.groups || selectedTable.groups.length === 0) && (
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-14 rounded-xl border-slate-100 bg-slate-50 hover:bg-white hover:border-primary transition-all font-bold group"
+                  onClick={() => handleSelectGroup("Group A")}
+                >
+                  <span className="h-8 w-8 rounded-lg bg-white border flex items-center justify-center mr-3 group-hover:border-primary/20 group-hover:text-primary transition-all">A</span>
+                  Group A
+                </Button>
+              )}
 
-            {/* Show Group A as default if no groups exist for an occupied table */}
-            {(!selectedTable?.groups || selectedTable.groups.length === 0) && (
-              <Button
-                variant="outline"
-                className="w-full justify-start h-12"
-                onClick={() => handleSelectGroup("Group A")}
-              >
-                Group A
-              </Button>
-            )}
+              {selectedTable?.groups?.map((group, idx) => (
+                <Button
+                  key={group.id}
+                  variant="outline"
+                  className="w-full justify-start h-14 rounded-xl border-slate-100 bg-slate-50 hover:bg-white hover:border-primary transition-all font-bold group"
+                  onClick={() => handleSelectGroup(group.name)}
+                >
+                  <span className="h-8 w-8 rounded-lg bg-white border flex items-center justify-center mr-3 group-hover:border-primary/20 group-hover:text-primary transition-all">
+                    {group.name.slice(-1)}
+                  </span>
+                  {group.name}
+                </Button>
+              ))}
+            </div>
 
-            {selectedTable?.groups?.map((group) => (
-              <Button
-                key={group.id}
-                variant="outline"
-                className="w-full justify-start h-12"
-                onClick={() => handleSelectGroup(group.name)}
-              >
-                {group.name}
-              </Button>
-            ))}
-
-            <div className="pt-2 border-t">
-              <p className="text-sm text-muted-foreground mb-2">Create new group:</p>
+            <div className="pt-4 border-t border-dashed">
+              <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-3">Create New Group</p>
               <div className="flex gap-2">
                 <Input
-                  placeholder="Group name"
+                  placeholder="e.g. Group B"
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
+                  className="h-12 rounded-xl bg-slate-50 border-none focus-visible:ring-primary/20"
                 />
-                <Button onClick={handleCreateGroup} disabled={!newGroupName.trim()}>
-                  <Plus className="h-4 w-4" />
+                <Button
+                  onClick={handleCreateGroup}
+                  disabled={!newGroupName.trim()}
+                  className="h-12 w-12 rounded-xl gradient-warm shadow-lg"
+                >
+                  <Plus className="h-6 w-6" />
                 </Button>
               </div>
             </div>

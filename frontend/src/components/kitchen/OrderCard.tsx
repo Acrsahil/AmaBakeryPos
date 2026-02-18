@@ -63,7 +63,12 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
         <div className="text-right">
           <div className="text-sm font-bold text-slate-700">Tb {order.tableNumber}</div>
           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{order.groupName || 'Group A'}</div>
-          <div className="text-xs text-slate-400">{order.waiter}</div>
+          {order.floorName && (
+            <div className="text-[9px] font-black text-primary uppercase mt-0.5 px-1.5 py-0.5 bg-primary/5 rounded border border-primary/10 inline-block">
+              {order.floorName}
+            </div>
+          )}
+          <div className="text-xs text-slate-400 mt-1">{order.waiter}</div>
         </div>
       </div>
 

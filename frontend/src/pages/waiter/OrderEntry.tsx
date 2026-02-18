@@ -9,7 +9,7 @@ import { saveTableOrder } from "@/lib/orderStorage";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, Search, X, Receipt, Loader2 } from "lucide-react";
+import { ShoppingCart, Search, X, Receipt, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 import { fetchProducts, fetchCategories } from "../../api/index.js";
 
@@ -175,6 +175,7 @@ export default function OrderEntry() {
         cart,
         tableNumber,
         groupName,
+        floorId: searchParams.get('floorId'),
       }
     });
   };
