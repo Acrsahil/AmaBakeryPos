@@ -82,10 +82,12 @@ export default function AdminMenu() {
     };
 
     const filteredItems = products.filter(item => {
-        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+        if (!item) return false;
+        const itemName = item.name || "";
+        const matchesSearch = itemName.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesCategory = categoryFilter === 'all' || item.category_name === categoryFilter;
         return matchesSearch && matchesCategory;
-    }).sort((a, b) => a.name.localeCompare(b.name));
+    }).sort((a, b) => (a?.name || "").localeCompare(b?.name || ""));
 
     const handleToggleAvailability = async (productId: number, currentStatus: boolean) => {
         try {
