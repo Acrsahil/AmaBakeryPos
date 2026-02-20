@@ -33,6 +33,17 @@ export default function TableSelection() {
       try {
         const branchFloors = await fetchTables();
         setFloors(branchFloors || []);
+
+        // Load from localStorage
+        const storedFloorId = localStorage.getItem('selectedFloorId');
+        if (storedFloorId && branchFloors) {
+          const found = branchFloors.find((f: any) => f.id.toString() === storedFloorId);
+          if (found) {
+            setSelectedFloor(found);
+            return;
+          }
+        }
+
         if (branchFloors && branchFloors.length > 0) {
           setSelectedFloor(branchFloors[0]);
         }
@@ -42,6 +53,11 @@ export default function TableSelection() {
     };
     loadInitialData();
   }, [user?.branch_id]);
+
+  const handleFloorChange = (floor: any) => {
+    setSelectedFloor(floor);
+    localStorage.setItem('selectedFloorId', floor.id.toString());
+  };
 
   useEffect(() => {
     if (selectedFloor) {
@@ -158,7 +174,7 @@ export default function TableSelection() {
                 <DropdownMenuItem
                   key={floor.id}
                   className="h-12 rounded-xl focus:bg-primary/10 focus:text-primary transition-colors cursor-pointer"
-                  onClick={() => setSelectedFloor(floor)}
+                  onClick={() => handleFloorChange(floor)}
                 >
                   <Layers className="h-4 w-4 mr-3 opacity-50" />
                   <span className="font-bold">{floor.name}</span>
