@@ -36,8 +36,17 @@ export default function KitchenDisplay() {
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [floors, setFloors] = useState<any[]>([]);
-  const [selectedFloorId, setSelectedFloorId] = useState<number | 'all'>('all');
+  const [selectedFloorId, setSelectedFloorId] = useState<number | 'all'>(() => {
+    const stored = localStorage.getItem('kitchenFloorFilter');
+    if (stored === 'all' || !stored) return 'all';
+    return Number(stored);
+  });
   const [loading, setLoading] = useState(true);
+
+  const handleFloorChange = (id: number | 'all') => {
+    setSelectedFloorId(id);
+    localStorage.setItem('kitchenFloorFilter', id.toString());
+  };
 
   useEffect(() => {
     loadData();
@@ -219,14 +228,14 @@ export default function KitchenDisplay() {
                 <DropdownMenuContent className="w-[200px] rounded-xl p-2">
                   <DropdownMenuLabel className="text-[10px] uppercase tracking-widest font-black text-slate-400 px-3 py-2">Select Floor</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="h-10 rounded-lg cursor-pointer font-bold" onClick={() => setSelectedFloorId('all')}>
+                  <DropdownMenuItem className="h-10 rounded-lg cursor-pointer font-bold" onClick={() => handleFloorChange('all')}>
                     All Floors
                   </DropdownMenuItem>
                   {floors.map((floor) => (
                     <DropdownMenuItem
                       key={floor.id}
                       className="h-10 rounded-lg cursor-pointer font-bold flex items-center justify-between"
-                      onClick={() => setSelectedFloorId(floor.id)}
+                      onClick={() => handleFloorChange(floor.id)}
                     >
                       <div className="flex items-center gap-2">
                         <Layers className="h-3.5 w-3.5 opacity-40" />

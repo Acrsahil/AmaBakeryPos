@@ -47,6 +47,14 @@ export default function AdminTables() {
             // But for safety or if admin sees all, we might want to filter here or just show all
             setFloors(data || []);
             if (data && data.length > 0 && selectedFloorId === null) {
+                const storedFloorId = localStorage.getItem('adminSelectedFloorId');
+                if (storedFloorId) {
+                    const found = data.find((f: any) => f.id.toString() === storedFloorId);
+                    if (found) {
+                        setSelectedFloorId(found.id);
+                        return;
+                    }
+                }
                 setSelectedFloorId(data[0].id);
             }
         } catch (error) {
@@ -107,6 +115,11 @@ export default function AdminTables() {
 
     const updateFloorLocally = (id: number, field: string, value: any) => {
         setFloors(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f));
+    };
+
+    const handleFloorSelection = (id: number) => {
+        setSelectedFloorId(id);
+        localStorage.setItem('adminSelectedFloorId', id.toString());
     };
 
     const selectedFloor = floors.find(f => f.id === selectedFloorId);
@@ -209,7 +222,7 @@ export default function AdminTables() {
                                 <div
                                     key={floor.id}
                                     className={`p-4 rounded-2xl border transition-all ${selectedFloorId === floor.id ? 'bg-primary/5 border-primary/20 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-300'}`}
-                                    onClick={() => setSelectedFloorId(floor.id)}
+                                    onClick={() => handleFloorSelection(floor.id)}
                                 >
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="flex-1 space-y-3">

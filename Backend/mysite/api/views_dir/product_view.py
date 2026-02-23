@@ -171,8 +171,8 @@ class ProductViewClass(APIView):
                     {
                         "success": True,
                         "message": "Product created successfully",
-                        "Poduct_data": serializer.data,
-                        "itemactivity_data": itemserilizer.data,
+                        "data": serializer.data,
+                        "item_activity": itemserilizer.data,
                     },
                     status=status.HTTP_201_CREATED,
                 )
