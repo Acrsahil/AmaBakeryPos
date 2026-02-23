@@ -8,3 +8,11 @@ start.sh
 __pycache__/
 *.pyc
 
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
