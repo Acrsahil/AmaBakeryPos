@@ -34,6 +34,7 @@ class DashboardApiView(APIView):
                     )
             
             if action == 'totalsales':
+                print(" i am here ")
                 today_invoices = Invoice.objects.filter(branch = my_branch,created_at__date = self.todaydate)
                 yesterday_invoices = Invoice.objects.filter(branch = my_branch,created_at__date = self.yesterdaydate)
 
