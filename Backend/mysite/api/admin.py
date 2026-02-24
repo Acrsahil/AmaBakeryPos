@@ -130,7 +130,7 @@ class InvoiceAdmin(admin.ModelAdmin):
 
 @admin.register(InvoiceItem)
 class InvoiceItemAdmin(admin.ModelAdmin):
-    list_display = ("id", "product", "quantity", "unit_price", "discount_amount")
+    list_display = ("id", "product", "quantity", "unit_price", "discount_amount","created_at")
 
 
 @admin.register(Payment)
