@@ -181,10 +181,12 @@ class PaymentClassView(APIView):
         
         if role == "WAITER":
             invoice.received_by_waiter = request.user
+            invoice.payment_status = "PARTIAL"
         elif role in ["COUNTER", "BRANCH_MANAGER", "ADMIN", "SUPER_ADMIN"]:
             invoice.received_by_counter = request.user
 
-        if invoice.paid_amount >= invoice.total_amount:
+        if invoice.paid_amount >= invoice.total_amount and role in ["COUNTER","BRANCH_MANAGER","ADMIN","SUPER_ADMIN"]:
+            print("i am inside first condition ")
             invoice.payment_status = "PAID"
         elif invoice.paid_amount > 0:
             invoice.payment_status = "PARTIAL"

@@ -127,7 +127,10 @@ class InvoiceViewClass(APIView):
             )
 
         # Don't allow modifying paid/cancelled invoices
+
+        print("i", invoice.payment_status)
         if invoice.payment_status in ["PAID", "CANCELLED"]:
+            print("i am inside patch method!")
             return Response(
                 {
                     "success": False,

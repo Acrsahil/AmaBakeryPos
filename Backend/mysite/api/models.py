@@ -145,10 +145,16 @@ class Invoice(models.Model):
         User, on_delete=models.SET_NULL, null=True, related_name="created_invoices"
     )
     received_by_waiter = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, related_name="waiter_received_invoices"
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="waiter_received_invoices",
     )
     received_by_counter = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, related_name="counter_received_invoices"
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="counter_received_invoices",
     )
     floor = models.ForeignKey(
         Floor, on_delete=models.SET_NULL, null=True, related_name="floor_invoices"
@@ -194,7 +200,11 @@ class Invoice(models.Model):
 class InvoiceItem(models.Model):
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="bills")
     product = models.ForeignKey(
-        Product, null=True, blank=True, on_delete=models.SET_NULL, related_name="products"
+        Product,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="products",
     )
     quantity = models.PositiveIntegerField(default=1)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -278,7 +288,7 @@ class ItemActivity(models.Model):
         ("ADD_STOCK", "Add Stock"),
         ("REDUCE_STOCK", "Reduce Stock"),
         ("EDIT_STOCK", "Edit Stock"),
-        ('SALES',"Sales"),
+        ("SALES", "Sales"),
     ]
     types = models.CharField(max_length=50, choices=TYPE_CHOICES)
     remarks = models.TextField(blank=True)

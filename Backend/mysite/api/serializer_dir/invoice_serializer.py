@@ -61,9 +61,10 @@ class InvoiceSerializer(serializers.ModelSerializer):
         )
 
         # Log who received the initial payment
+        role = getattr(user, "user_type", None)
         if paid_amount > 0 and user:
-            role = getattr(user, "user_type", None)
             if role == "WAITER":
+                invoice.payment_status="PENDING",
                 invoice.received_by_waiter = user
             elif role in ["COUNTER", "BRANCH_MANAGER", "ADMIN", "SUPER_ADMIN"]:
                 invoice.received_by_counter = user
@@ -101,7 +102,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         invoice.total_amount = subtotal + (invoice.tax_amount or Decimal("0.00")) - (invoice.discount or Decimal("0.00"))
 
         # Payment status logic
-        if invoice.paid_amount >= invoice.total_amount:
+        if invoice.paid_amount >= invoice.total_amount and role in ["COUNTER","ADMIN","BRANCH_MANAGER","SUPER_ADMIN"]:
             invoice.payment_status = "PAID"
         elif invoice.paid_amount > 0:
             invoice.payment_status = "PARTIAL"
@@ -111,10 +112,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
         invoice.save()
         return invoice
 
-    def update(self, instance, validated_data):
+    def update(self ,instance, validated_data):
         # For simplicity — you can expand this if partial updates of items are needed
         items_data = validated_data.pop("items", None)
         paid_amount = validated_data.pop("paid_amount", None)
+        request = self.context.get("request")
+        user = request.user if request else None
+        role = getattr(user, "user_type", None)
 
         # Update scalar fields
         for attr, value in validated_data.items():
@@ -134,7 +138,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             instance.total_amount = subtotal + (instance.tax_amount or 0) - (instance.discount or 0)
 
         # Re-evaluate payment status
-        if instance.paid_amount >= instance.total_amount:
+        if instance.paid_amount >= instance.total_amount and role in ["COUNTER","ADMIN","BRANCH_MANAGER","SUPER_ADMIN"]:
             instance.payment_status = "PAID"
         elif instance.paid_amount > 0:
             instance.payment_status = "PARTIAL"
