@@ -207,7 +207,6 @@ class DashboardViewClass(APIView):
                     (today_avg_order - yesterday_avg_order) / yesterday_avg_order
                 ) * 100
 
-            # 4.peak hours
             hourly_orders = (
                 self.date_filter(my_branch, self.todaydate, self.todaydate)
                 .annotate(hour=TruncHour("created_at"))
@@ -220,6 +219,8 @@ class DashboardViewClass(APIView):
             ]
             peak_hours = hourly_orders.filter(total_orders=max_orders)
             formatted_peak_hours = [h["hour"].strftime("%I:%M %p") for h in peak_hours]
+
+            print("Max Orders-> ", max_orders)
 
             # 5.sales by category piechart
             total_sales_per_category = (
