@@ -19,10 +19,14 @@ import {
     CheckCircle2,
     XCircle,
     Tag,
-    Store
+    Store,
+    Check,
+    ChevronsUpDown
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories, createCategory, deleteCategory, updateCategory } from "../../api/index.js";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface Product {
     id: number;
@@ -61,6 +65,9 @@ export default function AdminMenu() {
     const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
     const [editingCategoryName, setEditingCategoryName] = useState("");
     const [formAvailable, setFormAvailable] = useState(true);
+    const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+    const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
+    const [catSearchValue, setCatSearchValue] = useState("");
 
     useEffect(() => {
         loadData();
@@ -128,9 +135,15 @@ export default function AdminMenu() {
             selling_price: formData.get("selling_price"),
             product_quantity: 0,
             low_stock_bar: 0,
-            category: parseInt(formData.get("category") as string),
+            category: selectedCategoryId,
             is_available: formAvailable
         };
+
+        if (!selectedCategoryId) {
+            toast.error("Please select a category");
+            setSubmitting(false);
+            return;
+        }
 
         try {
             if (editItem) {
@@ -232,7 +245,10 @@ export default function AdminMenu() {
                         <DialogTrigger asChild>
                             <Button size="sm" className="w-full sm:w-auto font-bold" onClick={() => {
                                 setEditItem(null);
+                                setSelectedCategoryId(null);
                                 setFormAvailable(true);
+                                setCatSearchValue("");
+                                setIsCatDropdownOpen(false);
                             }}>
                                 <Plus className="h-4 w-4 mr-2" />
                                 Add Item
@@ -254,18 +270,85 @@ export default function AdminMenu() {
                                     <Input id="selling_price" name="selling_price" className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20 font-bold text-primary" type="number" step="0.01" placeholder="0.00" defaultValue={editItem?.selling_price} required />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 items-end">
-                                    <div className="space-y-2">
+                                    <div className="space-y-2 relative">
                                         <Label htmlFor="category" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Category</Label>
-                                        <Select name="category" defaultValue={editItem?.category?.toString()}>
-                                            <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20">
-                                                <SelectValue placeholder="Select category" />
-                                            </SelectTrigger>
-                                            <SelectContent className="rounded-2xl border-none shadow-2xl">
-                                                {categories.map(cat => (
-                                                    <SelectItem key={cat.id} value={cat.id.toString()} className="rounded-xl my-1">{cat.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <div className="relative">
+                                            <Input
+                                                id="category"
+                                                autoComplete="off"
+                                                placeholder="Search or type new category..."
+                                                value={catSearchValue}
+                                                onChange={(e) => {
+                                                    setCatSearchValue(e.target.value);
+                                                    setIsCatDropdownOpen(true);
+                                                    const match = categories.find(c => c.name.toLowerCase() === e.target.value.toLowerCase());
+                                                    if (match) setSelectedCategoryId(match.id);
+                                                    else setSelectedCategoryId(null);
+                                                }}
+                                                onFocus={() => setIsCatDropdownOpen(true)}
+                                                className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20 pr-10"
+                                            />
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                                                <Search className="h-4 w-4" />
+                                            </div>
+                                        </div>
+
+                                        {isCatDropdownOpen && (
+                                            <>
+                                                <div
+                                                    className="fixed inset-0 z-[100]"
+                                                    onClick={() => setIsCatDropdownOpen(false)}
+                                                />
+                                                <Card className="absolute top-full left-0 right-0 mt-2 z-[110] rounded-2xl border border-slate-100 shadow-2xl overflow-hidden max-h-[250px] overflow-y-auto scrollbar-hide py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                    {categories
+                                                        .filter(cat => cat.name.toLowerCase().includes(catSearchValue.toLowerCase()))
+                                                        .map(cat => (
+                                                            <button
+                                                                key={cat.id}
+                                                                type="button"
+                                                                className="w-full text-left px-4 py-3 text-sm font-bold hover:bg-primary/5 hover:text-primary transition-colors flex items-center justify-between group"
+                                                                onClick={() => {
+                                                                    setSelectedCategoryId(cat.id);
+                                                                    setCatSearchValue(cat.name);
+                                                                    setIsCatDropdownOpen(false);
+                                                                }}
+                                                            >
+                                                                <span>{cat.name}</span>
+                                                                <Check className={cn("h-4 w-4 text-primary", selectedCategoryId === cat.id ? "opacity-100" : "opacity-0")} />
+                                                            </button>
+                                                        ))}
+
+                                                    {catSearchValue.trim() && !categories.some(c => c.name.toLowerCase() === catSearchValue.toLowerCase()) && (
+                                                        <button
+                                                            type="button"
+                                                            className="w-full text-left px-4 py-3 text-sm font-black text-primary bg-primary/5 hover:bg-primary/10 transition-all flex items-center gap-2 border-t border-slate-50"
+                                                            onClick={async () => {
+                                                                try {
+                                                                    const response = await createCategory({ name: catSearchValue.trim() });
+                                                                    const newCat = response.data;
+                                                                    setCategories(prev => [...prev, newCat].sort((a, b) => a.name.localeCompare(b.name)));
+                                                                    setSelectedCategoryId(newCat.id);
+                                                                    setCatSearchValue(newCat.name);
+                                                                    setIsCatDropdownOpen(false);
+                                                                    toast.success(`Category "${newCat.name}" added`);
+                                                                } catch (err: any) {
+                                                                    toast.error(err.message || "Failed to add category");
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Plus className="h-4 w-4" />
+                                                            Add "{catSearchValue}"
+                                                        </button>
+                                                    )}
+
+                                                    {catSearchValue.trim() === "" && categories.length === 0 && (
+                                                        <div className="px-4 py-8 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">
+                                                            No categories found
+                                                        </div>
+                                                    )}
+                                                </Card>
+                                            </>
+                                        )}
                                     </div>
                                     <div className="flex items-center space-x-3 pb-2.5 pl-2">
                                         <Switch
@@ -431,8 +514,11 @@ export default function AdminMenu() {
                                                 className="h-9 w-9 text-slate-400 hover:text-primary hover:bg-primary/5 transition-colors"
                                                 onClick={() => {
                                                     setEditItem(item);
+                                                    setSelectedCategoryId(item.category);
                                                     setFormAvailable(item.is_available);
                                                     setIsDialogOpen(true);
+                                                    setCatSearchValue(item.category_name || "");
+                                                    setIsCatDropdownOpen(false);
                                                 }}
                                             >
                                                 <Pencil className="h-4 w-4" />

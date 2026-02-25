@@ -1,13 +1,9 @@
-for main dashboard tab
-
-link: http://127.0.0.1:8000/api/calculate/dashboard-details/1/ for admin,superadmin
-link: http://127.0.0.1:8000/api/calculate/dashboard-details/ for branch manager
-
 for admin , super admin -> dashboard (Different Ui)
 link: http://127.0.0.1:8000/api/calculate/dashboard-details/ for admin,superadmin
 
-get method only
-response on postman
+note : this is without branch_id
+method - get
+
 {
     "success": true,
     "total_sales": 131470.0,
@@ -167,6 +163,4 @@ response on postman
 "total_orders": 5,
 "total_sales": 150.0
 }
-],
-"growth_percent": 29059.0
 }

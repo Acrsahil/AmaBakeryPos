@@ -2,24 +2,57 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { AdminSidebar } from "./AdminSidebar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, MapPin } from "lucide-react";
+import { Menu, MapPin, LogOut, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { branches, User } from "@/lib/mockData";
+import { branches, User as UserType } from "@/lib/mockData";
+import { logout } from "@/auth/auth";
 
 export function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Get current user and branch
   const storedUser = localStorage.getItem('currentUser');
-  const user: User | null = storedUser ? JSON.parse(storedUser) : null;
+  const user: UserType | null = storedUser ? JSON.parse(storedUser) : null;
   const branch = branches.find(b => b.id === user?.branchId);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50/50">
       {/* Desktop Sidebar */}
       <aside className="fixed left-0 top-0 z-40 h-screen w-64 hidden md:block">
         <AdminSidebar />
       </aside>
+
+      {/* Desktop Header */}
+      <header className="fixed top-0 left-64 right-0 z-30 h-16 hidden md:flex items-center justify-between px-8 bg-white/80 backdrop-blur-md border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-primary" />
+          <span className="font-bold text-slate-700">{branch?.name || "Ama Bakery HQ"}</span>
+        </div>
+
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-sm font-bold text-slate-900 leading-none">{user?.username || "Admin"}</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Branch Manager</p>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-primary/20">
+              <UserIcon className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="h-8 w-px bg-slate-100" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (confirm("Are you sure you want to log out?")) logout();
+            }}
+            className="text-red-500 hover:text-red-600 hover:bg-red-50 font-bold gap-2 rounded-xl transition-all active:scale-95"
+          >
+            <LogOut className="h-4 w-4" />
+            Logout
+          </Button>
+        </div>
+      </header>
 
       {/* Mobile Header */}
       <div className="md:hidden sticky top-0 z-30 flex items-center justify-between p-4 pr-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -47,7 +80,7 @@ export function AdminLayout() {
         </div>
       </div>
 
-      <main className="md:ml-64 min-h-screen transition-all duration-200 ease-in-out">
+      <main className="md:ml-64 md:pt-16 min-h-screen transition-all duration-200 ease-in-out">
         <Outlet />
       </main>
     </div>
