@@ -1,4 +1,5 @@
 import { jwtDecode } from "jwt-decode";
+import { getAccessToken, clearTokens } from "../api/index.js";
 
 interface DecodedToken {
   user_id: string;
@@ -12,7 +13,7 @@ interface DecodedToken {
 }
 
 export function isLoggedIn() {
-  const token = localStorage.getItem("access");
+  const token = getAccessToken();
   if (!token) return false;
 
   try {
@@ -25,7 +26,7 @@ export function isLoggedIn() {
 }
 
 export function getDecodedToken(): DecodedToken | null {
-  const token = localStorage.getItem("access");
+  const token = getAccessToken();
   if (!token) return null;
   try {
     return jwtDecode<DecodedToken>(token);
@@ -54,9 +55,6 @@ export function getCurrentUser() {
 }
 
 export function logout() {
-  localStorage.removeItem("access");
-  localStorage.removeItem("refresh");
-  localStorage.removeItem("currentUser");
-  localStorage.removeItem("currentWaiter");
+  clearTokens();
   window.location.href = "/login";
 }

@@ -1,13 +1,119 @@
 const RAW_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const apiBaseUrl = RAW_BASE.replace(/\/+$/, ""); // remove trailing /
 
+// --- TOKEN MANAGEMENT ---
+// In-memory access token (more secure against XSS)
+let _accessToken = null;
 
-// Helper to save tokens to localStorage
+// Helper to save tokens
 function saveTokens(tokens) {
-  localStorage.setItem("access", tokens.access);
-  localStorage.setItem("refresh", tokens.refresh);
+  _accessToken = tokens.access;
+  if (tokens.refresh) {
+    localStorage.setItem("refresh", tokens.refresh);
+  }
 }
 
+// Clear tokens (logout)
+export function clearTokens() {
+  _accessToken = null;
+  localStorage.removeItem("refresh");
+  localStorage.removeItem("currentUser");
+  localStorage.removeItem("currentWaiter");
+}
+
+// Get the current access token
+export function getAccessToken() {
+  return _accessToken;
+}
+
+// Refresh the access token
+export async function refreshAccessToken() {
+  const refreshToken = localStorage.getItem("refresh");
+  if (!refreshToken) throw new Error("No refresh token available");
+
+  const url = apiBaseUrl + "/api/token/refresh/";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh: refreshToken }),
+  });
+
+  if (!res.ok) {
+    clearTokens();
+    throw new Error("Session expired. Please login again.");
+  }
+
+  const data = await res.json();
+  _accessToken = data.access;
+  // Note: some systems return a new refresh token too
+  if (data.refresh) {
+    localStorage.setItem("refresh", data.refresh);
+  }
+  return _accessToken;
+}
+
+// Check if we have a session to restore
+export async function initializeAuth() {
+  if (_accessToken) return true;
+  const refreshToken = localStorage.getItem("refresh");
+  if (!refreshToken) return false;
+
+  try {
+    await refreshAccessToken();
+    return true;
+  } catch (err) {
+    console.error("Auth initialization failed:", err);
+    return false;
+  }
+}
+
+// --- SECURE FETCHER ---
+// This wrapper handles:
+// 1. Automatically adding Authorization header
+// 2. Handling 401 errors by attempting a token refresh
+// 3. Retrying the original request after refresh
+async function apiFetch(endpoint, options = {}) {
+  const url = endpoint.startsWith("http") ? endpoint : apiBaseUrl + endpoint;
+
+  // Prepare headers
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+
+  // Add access token if available
+  if (_accessToken) {
+    headers["Authorization"] = `Bearer ${_accessToken}`;
+  }
+
+  const fetchOptions = {
+    ...options,
+    headers,
+  };
+
+  let response = await fetch(url, fetchOptions);
+
+  // If 401 Unauthorized, try to refresh token once
+  if (response.status === 401) {
+    console.warn("Access token expired, attempting refresh...");
+    try {
+      const newToken = await refreshAccessToken();
+
+      // Retry with new token
+      fetchOptions.headers["Authorization"] = `Bearer ${newToken}`;
+      response = await fetch(url, fetchOptions);
+    } catch (refreshErr) {
+      console.error("Refresh failed:", refreshErr);
+      // If refresh fails, we're done. Let the 401 through or throw.
+      // Usually better to let the app handle the re-login.
+      window.dispatchEvent(new CustomEvent("unauthorized"));
+    }
+  }
+
+  return response;
+}
+
+// --- UTILS ---
 function safePreview(text, n = 300) {
   return (text || "").slice(0, n).replace(/\s+/g, " ").trim();
 }
@@ -16,574 +122,296 @@ async function safeJson(res) {
   const text = await res.text();
   const contentType = res.headers.get("content-type") || "";
 
-  // If server says JSON, parse it (even if empty)
   if (contentType.includes("application/json")) {
     return text ? JSON.parse(text) : null;
   }
 
-  // If not JSON, try parse anyway (some servers don't set header)
   try {
     return text ? JSON.parse(text) : null;
   } catch {
     throw new Error(
-      `Server did not return JSON.\n` +
-      `Status: ${res.status}\n` +
-      `Content-Type: ${contentType}\n` +
-      `Preview: ${safePreview(text)}`
+      `Server did not return JSON.\nStatus: ${res.status}\nContent-Type: ${contentType}\nPreview: ${safePreview(text)}`
     );
   }
 }
 
-export async function loginUsers(username, password) {
-  const url = apiBaseUrl + "/api/token/";
+// --- API METHODS ---
 
-  const res = await fetch(url, {
+export async function loginUsers(username, password) {
+  const url = "/api/token/";
+  const res = await apiFetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
   });
 
-  console.log("LOGIN:", res.status, res.headers.get("content-type"));
-
   const data = await safeJson(res);
-
   if (!res.ok) {
     throw new Error(data?.detail || data?.message || "Invalid username or password");
   }
 
-  // expected: {access, refresh}
   if (!data?.access || !data?.refresh) {
-    throw new Error("Login response missing tokens. Check backend response format.");
+    throw new Error("Login response missing tokens.");
   }
 
   saveTokens(data);
   return data;
 }
 
-// Optional: if you already have an endpoint that returns role/user details.
-// If you don't have it, don't call it.
 export async function fetchMe() {
-  const token = localStorage.getItem("access");
-  if (!token) throw new Error("No access token found");
-
-  const url = apiBaseUrl + "/api/me/";
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  console.log("ME:", res.status, res.headers.get("content-type"));
-
+  const res = await apiFetch("/api/me/");
   const data = await safeJson(res);
-
-  if (!res.ok) {
-    throw new Error(data?.detail || "Failed to fetch user profile");
-  }
-  console.log(data);
-
-  return data; // should include role, name, etc (if backend supports)
+  if (!res.ok) throw new Error(data?.detail || "Failed to fetch user profile");
+  return data;
 }
 
-// Staff / User Management APIs
 export async function fetchUsers() {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/users/";
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const res = await apiFetch("/api/users/");
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch users");
-  return data.users; // The backend returns {success, count, users}
+  return data.users;
 }
 
 export async function createUser(userData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/users/";
-
-  const res = await fetch(url, {
+  const res = await apiFetch("/api/users/", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(userData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || JSON.stringify(data?.errors) || "Failed to create user");
   return data.user;
 }
 
 export async function updateUser(id, userData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/users/${id}/`;
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/users/${id}/`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(userData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || JSON.stringify(data?.errors) || "Failed to update user");
   return data.user;
 }
 
 export async function deleteUser(id) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/users/${id}/`;
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/users/${id}/`, {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to delete user");
   return data;
 }
 
-// Product Management APIs
 export async function fetchProducts() {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/products/";
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const res = await apiFetch("/api/products/");
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch products");
-  return data.data; // The backend returns {success, data}
+  return data.data;
 }
 
 export async function createProduct(productData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/products/";
-
-
-  const res = await fetch(url, {
+  const res = await apiFetch("/api/products/", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(productData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || JSON.stringify(data?.errors) || "Failed to create product");
-  return data.data; // Return the created product object
+  return data.data;
 }
 
 export async function updateProduct(id, productData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/products/${id}/`;
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/products/${id}/`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(productData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || JSON.stringify(data?.errors) || "Failed to update product");
-  return data.data; // Return the updated product object
+  return data.data;
 }
 
 export async function deleteProduct(id) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/products/${id}/`;
-
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/products/${id}/`, {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to delete product");
   return data;
 }
 
-// Category Management APIs
 export async function fetchCategories() {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/category/";
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const res = await apiFetch("/api/category/");
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch categories");
-  return data.data; // The backend returns {success, data}
+  return data.data;
 }
 
 export async function createCategory(categoryData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/category/";
-
-  const res = await fetch(url, {
+  const res = await apiFetch("/api/category/", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(categoryData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to create category");
   return data;
 }
 
 export async function updateCategory(id, categoryData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/category/${id}/`;
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/category/${id}/`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(categoryData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to update category");
   return data;
 }
 
 export async function deleteCategory(id) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/category/${id}/`;
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/category/${id}/`, {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to delete category");
   return data;
 }
 
-// Branch Management APIs (SuperAdmin)
 export async function fetchBranches() {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/branch/";
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const res = await apiFetch("/api/branch/");
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch branches");
-  return data; // Returns {success, count, data: [...]}
+  return data;
 }
 
 export async function createBranch(branchData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/branch/";
-
-  const res = await fetch(url, {
+  const res = await apiFetch("/api/branch/", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(branchData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to create branch");
-  return data; // Returns {success, message, data}
+  return data;
 }
 
 export async function updateBranch(id, branchData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/branch/${id}/`;
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/branch/${id}/`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(branchData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to update branch");
   return data;
 }
 
 export async function deleteBranch(id) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/branch/${id}/`;
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/branch/${id}/`, {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to delete branch");
   return data;
 }
 
-// Customer Management APIs
 export async function fetchCustomers() {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/customer/";
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const res = await apiFetch("/api/customer/");
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch customers");
-  return data.data; // The backend returns {success, count, data: [...]}
+  return data.data;
 }
 
 export async function createCustomer(customerData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/customer/";
-
-  const res = await fetch(url, {
+  const res = await apiFetch("/api/customer/", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(customerData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to create customer");
   return data.data;
 }
 
 export async function updateCustomer(id, customerData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/customer/${id}/`;
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/customer/${id}/`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(customerData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to update customer");
   return data.data;
 }
 
 export async function deleteCustomer(id) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/customer/${id}/`;
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/customer/${id}/`, {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
   });
-
   const data = await safeJson(res);
-  // Some delete endpoints return 204 No Content, check status too
   if (!res.ok) throw new Error(data?.message || "Failed to delete customer");
   return data;
 }
 
-// Invoice & Checkout APIs
 export async function createInvoice(invoiceData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/invoice/";
-
-  const res = await fetch(url, {
+  const res = await apiFetch("/api/invoice/", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(invoiceData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to create invoice");
   return data.data;
 }
 
 export async function fetchInvoices() {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/invoice/";
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const res = await apiFetch("/api/invoice/");
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch invoices");
-  return data.data; // The backend returns { success: true, data: [...] }
+  return data.data;
 }
+
 export async function updateInvoiceStatus(id, status) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/invoice/${id}/`;
-
-  console.log("PATCH URL:", url);
-  console.log("PATCH BODY:", { invoice_status: status });
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/invoice/${id}/`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify({ invoice_status: status }),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to update invoice status");
   return data.data;
 }
-export async function addPayment(invoiceId, paymentData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/invoice/${invoiceId}/payments/`;
 
-  const res = await fetch(url, {
+export async function addPayment(invoiceId, paymentData) {
+  const res = await apiFetch(`/api/invoice/${invoiceId}/payments/`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(paymentData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to add payment");
   return data;
 }
 
 export async function createTable(tableData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/floor/";
-
-  const res = await fetch(url, {
+  const res = await apiFetch("/api/floor/", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(tableData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to create table");
   return data;
 }
 
 export async function fetchTables() {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + "/api/floor/";
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const res = await apiFetch("/api/floor/");
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch tables");
-  return data.data; // Expected {success, data: [...]}
+  return data.data;
 }
 
 export async function patchTable(id, tableData) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/floor/${id}/`;
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/floor/${id}/`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(tableData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to update table");
   return data.data;
 }
 
 export async function deleteTable(id) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/floor/${id}/`;
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/floor/${id}/`, {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
   });
-
   if (!res.ok) {
     const data = await safeJson(res);
     throw new Error(data?.message || "Failed to delete table");
@@ -591,76 +419,38 @@ export async function deleteTable(id) {
   return true;
 }
 
-// Item Activity & Stock Management
 export async function addItemActivity(productId, type, activityData) {
-  const token = localStorage.getItem("access");
-  // type is either 'add' or 'reduce'
-  const url = apiBaseUrl + `/api/itemactivity/${productId}/${type}/`;
-
-  const res = await fetch(url, {
+  const res = await apiFetch(`/api/itemactivity/${productId}/${type}/`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify(activityData),
   });
-
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to modify product");
   return data;
 }
 
 export async function fetchItemActivity(productId) {
-  const token = localStorage.getItem("access");
-  const url = apiBaseUrl + `/api/itemactivity/${productId}/detail/`;
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const res = await apiFetch(`/api/itemactivity/${productId}/detail/`);
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch item activity");
   return data.data;
 }
 
 export async function fetchDashboardDetails(branchId = null) {
-  const token = localStorage.getItem("access");
-  const url = branchId 
-    ? `${apiBaseUrl}/api/calculate/dashboard-details/${branchId}/`
-    : `${apiBaseUrl}/api/calculate/dashboard-details/`;
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const url = branchId
+    ? `/api/calculate/dashboard-details/${branchId}/`
+    : `/api/calculate/dashboard-details/`;
+  const res = await apiFetch(url);
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch dashboard details");
   return data;
 }
 
 export async function fetchReportDashboard(branchId = null) {
-  const token = localStorage.getItem("access");
-  const url = branchId 
-    ? `${apiBaseUrl}/api/calculate/report-dashboard/${branchId}/`
-    : `${apiBaseUrl}/api/calculate/report-dashboard/`;
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const url = branchId
+    ? `/api/calculate/report-dashboard/${branchId}/`
+    : `/api/calculate/report-dashboard/`;
+  const res = await apiFetch(url);
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch report dashboard");
   return data;

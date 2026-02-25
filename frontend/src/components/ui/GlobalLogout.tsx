@@ -11,12 +11,23 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function GlobalLogout() {
     const location = useLocation();
     const [showConfirm, setShowConfirm] = useState(false);
     const isLoginPage = location.pathname === "/login" || location.pathname === "/super-admin";
+
+    // Handle unauthorized event from api/index.js
+    useEffect(() => {
+        const handleUnauthorized = () => {
+            console.warn("Session expired or unauthorized. Logging out...");
+            logout();
+        };
+
+        window.addEventListener("unauthorized", handleUnauthorized);
+        return () => window.removeEventListener("unauthorized", handleUnauthorized);
+    }, []);
 
     if (!isLoggedIn() || isLoginPage) return null;
 
