@@ -455,3 +455,13 @@ export async function fetchReportDashboard(branchId = null) {
   if (!res.ok) throw new Error(data?.message || "Failed to fetch report dashboard");
   return data;
 }
+
+export async function fetchStaffReport(branchId = null) {
+  const url = branchId
+    ? `/api/calculate/staff-report/${branchId}/`
+    : `/api/calculate/staff-report/`;
+  const res = await apiFetch(url);
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to fetch staff report");
+  return data;
+}

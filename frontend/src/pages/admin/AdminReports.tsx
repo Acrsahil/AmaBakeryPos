@@ -26,16 +26,6 @@ import {
   Line
 } from "recharts";
 
-const weeklyData = [
-  { day: 'Mon', sales: 24500, orders: 42 },
-  { day: 'Tue', sales: 28200, orders: 48 },
-  { day: 'Wed', sales: 22100, orders: 38 },
-  { day: 'Thu', sales: 31500, orders: 52 },
-  { day: 'Fri', sales: 35800, orders: 61 },
-  { day: 'Sat', sales: 42300, orders: 72 },
-  { day: 'Sun', sales: 38400, orders: 65 },
-];
-
 const waiterPerformance = [
   { name: 'Rahul', orders: 45, sales: 8200, rating: 4.8 },
   { name: 'Priya', orders: 52, sales: 9450, rating: 4.9 },
@@ -47,6 +37,7 @@ export default function AdminReports() {
   const user = getCurrentUser();
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [missingBranch, setMissingBranch] = useState(false);
 
   useEffect(() => {
     loadReportData();
@@ -54,8 +45,18 @@ export default function AdminReports() {
 
   const loadReportData = async () => {
     setLoading(true);
+    setMissingBranch(false);
     try {
-      const branchId = (user?.role === 'admin' || user?.role === 'superadmin') ? (user?.branch_id || 1) : null;
+      // api.md spec: admin/superadmin must supply a branch_id for report endpoint.
+      // Branch managers call the URL without an id (their branch is inferred from JWT).
+      const isSuperOrAdmin = user?.is_superuser || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+      if (isSuperOrAdmin && !user?.branch_id) {
+        // Global admin has no branch assigned — cannot show branch report.
+        setMissingBranch(true);
+        setLoading(false);
+        return;
+      }
+      const branchId = isSuperOrAdmin ? user?.branch_id : null;
       const data = await fetchReportDashboard(branchId);
       setReportData(data);
     } catch (error) {
@@ -66,8 +67,29 @@ export default function AdminReports() {
     }
   };
 
+  // Build weekly chart data from API Weekly_sales field
+  const weeklySalesRaw = reportData?.Weekly_sales || {};
+  const weeklyChartData = [
+    { day: 'Mon', sales: weeklySalesRaw.monday || 0 },
+    { day: 'Tue', sales: weeklySalesRaw.tuesday || 0 },
+    { day: 'Wed', sales: weeklySalesRaw.wednesday || 0 },
+    { day: 'Thu', sales: weeklySalesRaw.thursday || 0 },
+    { day: 'Fri', sales: weeklySalesRaw.friday || 0 },
+    { day: 'Sat', sales: weeklySalesRaw.saturday || 0 },
+    { day: 'Sun', sales: weeklySalesRaw.sunday || 0 },
+  ];
+
+  // Real top-selling items from API
+  const topItems: any[] = reportData?.top_selling_items_count || [];
+
   return (
     <div className="p-6 space-y-6">
+      {/* Show message if global admin has no branch */}
+      {missingBranch && (
+        <div className="card-elevated p-6 border border-amber-200 bg-amber-50 rounded-xl">
+          <p className="text-amber-800 font-semibold">Select a specific branch to view its reports. Your global admin account is not assigned to a branch.</p>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -137,11 +159,10 @@ export default function AdminReports() {
               <h3 className="text-lg font-semibold">Weekly Sales Trend</h3>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm">This Week</Button>
-                <Button variant="ghost" size="sm">Last Week</Button>
               </div>
             </div>
             <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={weeklyData}>
+              <LineChart data={weeklyChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" />
                 <YAxis stroke="hsl(var(--muted-foreground))" />
@@ -197,10 +218,10 @@ export default function AdminReports() {
           <div className="card-elevated p-6">
             <h3 className="text-lg font-semibold mb-6">Top Selling Items</h3>
             <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={analyticsData.topItems} layout="vertical">
+              <BarChart data={topItems} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis type="number" stroke="hsl(var(--muted-foreground))" />
-                <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" width={120} />
+                <YAxis dataKey="product__name" type="category" stroke="hsl(var(--muted-foreground))" width={120} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
@@ -208,7 +229,7 @@ export default function AdminReports() {
                     borderRadius: '8px'
                   }}
                 />
-                <Bar dataKey="count" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="total_orders" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -224,17 +245,23 @@ export default function AdminReports() {
                 </tr>
               </thead>
               <tbody>
-                {analyticsData.topItems.map((item, index) => (
-                  <tr key={item.name} className="border-t">
+                {topItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
+                      {loading ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : 'No data available'}
+                    </td>
+                  </tr>
+                ) : topItems.map((item, index) => (
+                  <tr key={item.product__name} className="border-t">
                     <td className="px-6 py-4">
                       <span className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
                         {index + 1}
                       </span>
                     </td>
-                    <td className="px-6 py-4 font-medium">{item.name}</td>
-                    <td className="px-6 py-4">{item.count}</td>
+                    <td className="px-6 py-4 font-medium">{item.product__name}</td>
+                    <td className="px-6 py-4">{item.total_orders}</td>
                     <td className="px-6 py-4 text-right font-semibold text-primary">
-                      Rs.{item.revenue.toLocaleString()}
+                      Rs.{Number(item.total_sales || 0).toLocaleString()}
                     </td>
                   </tr>
                 ))}

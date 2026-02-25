@@ -1,8 +1,8 @@
 import { StatCard } from "@/components/admin/StatCard";
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { analyticsData, branches, User } from "@/lib/mockData";
-import { fetchDashboardDetails, fetchInvoices, fetchTables, patchTable } from "@/api/index.js";
+import { branches } from "@/lib/mockData";
+import { fetchDashboardDetails, fetchInvoices, fetchTables } from "@/api/index.js";
 import { getCurrentUser } from "../../auth/auth";
 import { toast } from "sonner";
 import {
@@ -49,10 +49,12 @@ export default function AdminDashboard() {
 
   const loadDashboardData = async () => {
     try {
-      // If user is admin/superadmin, they might need a specific branch ID.
-      // Based on the request, for admin/superadmin it's /1/, for manager it's default.
-      // We'll use branch_id if available, or 1 as fallback for admin.
-      const branchId = (user?.role === 'admin' || user?.role === 'superadmin') ? (user?.branch_id || 1) : null;
+      // api.md spec:
+      // - ADMIN/SUPER_ADMIN with no branch_id → global summary (total_sales, total_branch, etc.)
+      // - ADMIN/SUPER_ADMIN with branch_id  → branch-specific today's stats
+      // - BRANCH_MANAGER                     → branch-specific today's stats (no id in URL)
+      const isSuperOrAdmin = user?.is_superuser || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+      const branchId = isSuperOrAdmin ? (user?.branch_id || null) : null;
       const data = await fetchDashboardDetails(branchId);
       setDashboardData(data);
     } catch (error) {
@@ -93,10 +95,21 @@ export default function AdminDashboard() {
     status: 'available'
   }));
 
-  const liveTableStatus = {
-    available: tableCount,
-    occupied: 0,
-  };
+  // Determine if we're showing global summary (admin/superadmin with no branch)
+  const isSuperOrAdmin = user?.is_superuser || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  const isGlobalView = isSuperOrAdmin && !user?.branch_id;
+
+  // Build weekly chart data from API response (handles both key spellings)
+  const weeklySalesRaw = dashboardData?.Weekely_Sales || dashboardData?.Weekly_sales || {};
+  const weeklyChartData = [
+    { day: 'Mon', sales: weeklySalesRaw.monday || 0 },
+    { day: 'Tue', sales: weeklySalesRaw.tuesday || 0 },
+    { day: 'Wed', sales: weeklySalesRaw.wednesday || 0 },
+    { day: 'Thu', sales: weeklySalesRaw.thursday || 0 },
+    { day: 'Fri', sales: weeklySalesRaw.friday || 0 },
+    { day: 'Sat', sales: weeklySalesRaw.saturday || 0 },
+    { day: 'Sun', sales: weeklySalesRaw.sunday || 0 },
+  ];
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -120,40 +133,70 @@ export default function AdminDashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Today's Sales"
-          value={`Rs.${dashboardData?.today_sales?.toLocaleString() || 0}`}
-          icon={DollarSign}
-          trend={{ value: Number(Math.abs(dashboardData?.sales_percent || 0).toFixed(1)), isPositive: (dashboardData?.sales_percent || 0) >= 0 }}
-        />
-        <StatCard
-          title="Total Orders"
-          value={dashboardData?.total_orders || 0}
-          icon={ShoppingBag}
-          trend={{ value: Number(Math.abs(dashboardData?.order_percent || 0).toFixed(1)), isPositive: (dashboardData?.order_percent || 0) >= 0 }}
-        />
-        <StatCard
-          title="Avg Order Value"
-          value={`Rs.${dashboardData?.today_sales && dashboardData?.total_orders ? (dashboardData.today_sales / dashboardData.total_orders).toFixed(0) : 0}`}
-          icon={TrendingUp}
-        />
-        <StatCard
-          title="Peak Hours"
-          value={dashboardData?.peak_hours?.[0] || "N/A"}
-          icon={Clock}
-          subtitle="Most orders"
-        />
+        {isGlobalView ? (
+          // Global summary stats for Admin/SuperAdmin (no branch_id)
+          <>
+            <StatCard
+              title="Total Network Sales"
+              value={`Rs.${dashboardData?.total_sales?.toLocaleString() || 0}`}
+              icon={DollarSign}
+            />
+            <StatCard
+              title="Total Branches"
+              value={dashboardData?.total_branch || 0}
+              icon={ShoppingBag}
+            />
+            <StatCard
+              title="Total Users"
+              value={dashboardData?.total_user || 0}
+              icon={TrendingUp}
+            />
+            <StatCard
+              title="Total Orders"
+              value={dashboardData?.total_count_order || 0}
+              icon={Clock}
+              subtitle={`Avg: Rs.${dashboardData?.average_order_value?.toFixed(0) || 0}`}
+            />
+          </>
+        ) : (
+          // Branch-specific stats
+          <>
+            <StatCard
+              title="Today's Sales"
+              value={`Rs.${dashboardData?.today_sales?.toLocaleString() || 0}`}
+              icon={DollarSign}
+              trend={{ value: Number(Math.abs(dashboardData?.sales_percent || 0).toFixed(1)), isPositive: (dashboardData?.sales_percent || 0) >= 0 }}
+            />
+            <StatCard
+              title="Total Orders"
+              value={dashboardData?.total_orders || 0}
+              icon={ShoppingBag}
+              trend={{ value: Number(Math.abs(dashboardData?.order_percent || 0).toFixed(1)), isPositive: (dashboardData?.order_percent || 0) >= 0 }}
+            />
+            <StatCard
+              title="Avg Order Value"
+              value={`Rs.${dashboardData?.avg_orders ? Number(dashboardData.avg_orders).toFixed(0) : 0}`}
+              icon={TrendingUp}
+            />
+            <StatCard
+              title="Peak Hours"
+              value={dashboardData?.peak_hours?.[0] || "N/A"}
+              icon={Clock}
+              subtitle="Most orders"
+            />
+          </>
+        )}
       </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Hourly Orders Chart */}
+        {/* Weekly Sales Chart */}
         <div className="lg:col-span-2 card-elevated p-6">
-          <h3 className="text-lg font-semibold mb-4">Orders by Hour</h3>
+          <h3 className="text-lg font-semibold mb-4">Weekly Sales</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={analyticsData.hourlyData}>
+            <BarChart data={weeklyChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="hour" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <Tooltip
                 contentStyle={{
@@ -161,8 +204,9 @@ export default function AdminDashboard() {
                   border: '1px solid hsl(var(--border))',
                   borderRadius: '8px'
                 }}
+                formatter={(value: number) => `Rs.${value.toLocaleString()}`}
               />
-              <Bar dataKey="orders" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

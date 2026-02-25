@@ -158,11 +158,11 @@ class DashboardViewClass(APIView):
 
             # 2.calculating order percent
             if yesterday_orders == 0:
-                (today_total_orders - yesterday_orders)
-
-            order_percent = (
-                (today_total_orders - yesterday_orders) / yesterday_orders
-            ) * 100
+                order_percent = float(today_total_orders - yesterday_orders)
+            else:
+                order_percent = (
+                    (today_total_orders - yesterday_orders) / yesterday_orders
+                ) * 100
 
             # 3. avg order value
             if today_total_orders == 0:
@@ -220,6 +220,52 @@ class DashboardViewClass(APIView):
                 .order_by("-total_orders")[:5]
             )
 
+            # 7. current week sales (Mon–Sun) for the Weekly Sales chart
+            today = timezone.now().date()
+            start_of_week = today - timedelta(days=today.weekday())  # Monday
+            end_of_week = start_of_week + timedelta(days=6)
+
+            branch_week_data = (
+                Invoice.objects.filter(
+                    branch=my_branch,
+                    created_at__date__gte=start_of_week,
+                    created_at__date__lte=end_of_week,
+                )
+                .annotate(
+                    year=ExtractYear("created_at"),
+                    week=ExtractWeek("created_at"),
+                    weekday=ExtractWeekDay("created_at"),  # 1=Sun, 2=Mon, ..., 7=Sat
+                )
+                .values("year", "week", "weekday")
+                .annotate(total_sales=Sum("total_amount"))
+                .order_by("year", "week", "weekday")
+            )
+
+            branch_days = {
+                "monday": 0,
+                "tuesday": 0,
+                "wednesday": 0,
+                "thursday": 0,
+                "friday": 0,
+                "saturday": 0,
+                "sunday": 0,
+            }
+            for item in branch_week_data:
+                if item["weekday"] == 2:
+                    branch_days["monday"] = item["total_sales"]
+                elif item["weekday"] == 3:
+                    branch_days["tuesday"] = item["total_sales"]
+                elif item["weekday"] == 4:
+                    branch_days["wednesday"] = item["total_sales"]
+                elif item["weekday"] == 5:
+                    branch_days["thursday"] = item["total_sales"]
+                elif item["weekday"] == 6:
+                    branch_days["friday"] = item["total_sales"]
+                elif item["weekday"] == 7:
+                    branch_days["saturday"] = item["total_sales"]
+                elif item["weekday"] == 1:
+                    branch_days["sunday"] = item["total_sales"]
+
             return Response(
                 {
                     "success": True,
@@ -232,6 +278,7 @@ class DashboardViewClass(APIView):
                     "peak_hours": formatted_peak_hours,
                     "total_sales_per_category": total_sales_per_category,
                     "top_selling_items": top_selling_items,
+                    "Weekely_Sales": branch_days,
                 }
             )
 
@@ -256,7 +303,10 @@ class ReportDashboardViewClass(APIView):
 
         if role in ["SUPER_ADMIN", "ADMIN"]:
             if not branch_id:
-                pass
+                return Response(
+                    {"success": False, "message": "branch_id is required for admin/superadmin"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             my_branch = branch_id
 
         if my_branch:
