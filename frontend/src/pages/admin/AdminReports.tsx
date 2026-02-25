@@ -253,7 +253,7 @@ export default function AdminReports() {
               </p>
             </div>
             <div className="card-elevated p-4 text-center">
-              <p className="text-sm text-muted-foreground">Growth</p>
+              <p className="text-sm text-muted-foreground">Monthy Growth</p>
               <p className={`text-2xl font-bold ${(reportData?.growth_percent || 0) >= 0 ? 'text-success' : 'text-destructive'}`}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : `${(reportData?.growth_percent || 0).toFixed(1)}%`}
               </p>
