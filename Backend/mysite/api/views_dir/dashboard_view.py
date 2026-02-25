@@ -2,7 +2,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
-from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, Sum
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, Sum, Value
 from django.db.models.functions import (
     ExtractHour,
     ExtractWeek,
@@ -107,27 +107,38 @@ class DashboardViewClass(APIView):
                     elif item["weekday"] == 1:
                         days["sunday"] = item["total_sales"]
 
-                # Hourly sales for today (8am to 8pm) - Global
-                hourly_data_global = (
-                    Invoice.objects.filter(
-                        created_at__date=today,
+                # sales by category pie chart percentage
+                
+                if total_sum > 0:
+                    sales_per_category = InvoiceItem.objects.values(
+                        'product__category__name'
+                    ).annotate(
+                        total_category_sum=Sum(
+                            ExpressionWrapper(
+                                F('quantity') * F('unit_price') - F('discount_amount'),
+                                output_field=DecimalField(max_digits=12, decimal_places=2)
+                            )
+                        )
+                    ).annotate(
+                        category_percent=ExpressionWrapper(
+                            (F('total_category_sum') * 100.0) / Value(total_sum),
+                            output_field=DecimalField(max_digits=10,decimal_places=2)
+                        )
                     )
-                    .annotate(hour=ExtractHour("created_at"))
-                    .values("hour")
-                    .annotate(total_sales=Sum("total_amount"))
-                )
+                else:
+                    sales_per_category = []
 
-                hourly_sales_global = []
-                for h in range(8, 21):
-                    label = f"{h if h <= 12 else h - 12} {'AM' if h < 12 else 'PM'}"
-                    if h == 12:
-                        label = "12 PM"
-                    sales_val = 0
-                    for item in hourly_data_global:
-                        if item["hour"] == h:
-                            sales_val = float(item["total_sales"] or 0)
-                            break
-                    hourly_sales_global.append({"hour": label, "sales": sales_val})
+                # branch performance
+                top_performance_branch = Branch.objects.values(
+                    'name'
+                    ).annotate(
+                        total_sales_per_branch = Sum(F('invoices__total_amount'))
+                    ).order_by('-total_sales_per_branch')[:5]
+                
+
+                # best selling items
+                top_sold_items = InvoiceItem.objects.values('product__name').annotate(total_sold_units = Sum('quantity')).order_by('-total_sold_units')[:5]
+
 
                 return Response(
                     {
@@ -137,8 +148,10 @@ class DashboardViewClass(APIView):
                         "total_user": total_user_count - 1,
                         "total_count_order": total_count_order,
                         "average_order_value": average,
+                        "sales_per_category":sales_per_category,
                         "Weekely_Sales": days,
-                        "Hourly_sales": hourly_sales_global,
+                        "top_perfomance_branch":top_performance_branch,
+                        "top_selling_items": top_sold_items,
                     },
                     status=status.HTTP_200_OK,
                 )
@@ -328,7 +341,8 @@ class DashboardViewClass(APIView):
                     "top_selling_items": top_selling_items,
                     "Weekely_Sales": branch_days,
                     "Hourly_sales": hourly_sales_branch,
-                }
+                },
+                status=status.HTTP_200_OK,
             )
 
 
@@ -514,5 +528,5 @@ class ReportDashboardViewClass(APIView):
                     "avg_order_month": avg_order_month,
                     "top_selling_items_count": top_selling_items_count,
                     "growth_percent": growth_percent,
-                }
+                },status=status.HTTP_200_OK
             )
