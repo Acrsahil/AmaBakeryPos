@@ -86,14 +86,32 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
         branch_id = self.context.get("branch")
         print(branch_id)
-        latest_invoice = (
-            Invoice.objects.filter(branch=branch_id).order_by("-created_at").first()
-        )
-        print("latest_invoice", latest_invoice)
+        latest_invoice = Invoice.objects.filter(branch=branch_id).order_by(
+            "-created_at"
+        )[1]
+        last_invoice_date = str(latest_invoice.created_at).split(" ")[0]
 
-        invoice.invoice_number = f"INV-{invoice.id:06d}"
-        print("date->>", str(datetime.today()))
-        print("date->>", str(datetime.today()).split(" ")[0])
+        latest_invoice_number = latest_invoice.invoice_number
+
+        print("latest_invoice_number -> ", latest_invoice)
+
+        today_date = str(datetime.today()).split(" ")[0]
+
+        print("Last_invoice_date->>", last_invoice_date)
+        print("Today date->>", today_date)
+
+        final_invoice_no = ""
+
+        if last_invoice_date != today_date:
+            day_list = today_date.split("-")
+            day_list.append("1")
+            final_invoice_no = "-".join(day_list)
+        else:
+            last_invoice_list = latest_invoice_number.split("-")
+            last_invoice_list[-1] = str(int(last_invoice_list[-1]) + 1)
+            final_invoice_no = "-".join(last_invoice_list)
+
+        invoice.invoice_number = final_invoice_no
 
         # Create items & calculate subtotal
         subtotal = Decimal("0.00")
