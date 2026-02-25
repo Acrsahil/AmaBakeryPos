@@ -1,12 +1,13 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+
 from dateutil.relativedelta import relativedelta
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, Sum
 from django.db.models.functions import (
+    ExtractHour,
     ExtractWeek,
     ExtractWeekDay,
     ExtractYear,
-    ExtractHour,
     TruncHour,
 )
 from django.utils import timezone
@@ -53,7 +54,6 @@ class DashboardViewClass(APIView):
                 average = total_sum / total_count_order
 
                 today = timezone.now().date()
-
 
                 start_of_week = today - timedelta(days=today.weekday())  # Monday
                 print("st_week->>", start_of_week)
@@ -119,8 +119,9 @@ class DashboardViewClass(APIView):
 
                 hourly_sales_global = []
                 for h in range(8, 21):
-                    label = f"{h if h <= 12 else h-12} {'AM' if h < 12 else 'PM'}"
-                    if h == 12: label = "12 PM"
+                    label = f"{h if h <= 12 else h - 12} {'AM' if h < 12 else 'PM'}"
+                    if h == 12:
+                        label = "12 PM"
                     sales_val = 0
                     for item in hourly_data_global:
                         if item["hour"] == h:
@@ -190,7 +191,7 @@ class DashboardViewClass(APIView):
             # 3. avg order value
             if today_total_orders == 0:
                 today_avg_order = 0
-            
+
             else:
                 today_avg_order = Decimal(str((today_sales) / today_total_orders))
 
@@ -302,8 +303,9 @@ class DashboardViewClass(APIView):
 
             hourly_sales_branch = []
             for h in range(8, 21):
-                label = f"{h if h <= 12 else h-12} {'AM' if h < 12 else 'PM'}"
-                if h == 12: label = "12 PM"
+                label = f"{h if h <= 12 else h - 12} {'AM' if h < 12 else 'PM'}"
+                if h == 12:
+                    label = "12 PM"
                 sales_val = 0
                 for item in hourly_data_branch:
                     if item["hour"] == h:
@@ -350,7 +352,10 @@ class ReportDashboardViewClass(APIView):
         if role in ["SUPER_ADMIN", "ADMIN"]:
             if not branch_id:
                 return Response(
-                    {"success": False, "message": "branch_id is required for admin/superadmin"},
+                    {
+                        "success": False,
+                        "message": "branch_id is required for admin/superadmin",
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             my_branch = branch_id
@@ -458,7 +463,6 @@ class ReportDashboardViewClass(APIView):
                 elif item["weekday"] == 1:
                     days["sunday"] = item["total_sales"]
 
-
             # Hourly sales for today (8am to 8pm)
             hourly_data_raw = (
                 Invoice.objects.filter(
@@ -473,9 +477,10 @@ class ReportDashboardViewClass(APIView):
             # Initialize hours 8am to 8pm as a list for charts
             hourly_sales_list = []
             for h in range(8, 21):
-                label = f"{h if h <= 12 else h-12} {'AM' if h < 12 else 'PM'}"
-                if h == 12: label = "12 PM"
-                
+                label = f"{h if h <= 12 else h - 12} {'AM' if h < 12 else 'PM'}"
+                if h == 12:
+                    label = "12 PM"
+
                 sales_val = 0
                 for item in hourly_data_raw:
                     if item["hour"] == h:
@@ -483,15 +488,18 @@ class ReportDashboardViewClass(APIView):
                         break
                 hourly_sales_list.append({"hour": label, "sales": sales_val})
 
-
             top_selling_items_count = (
                 InvoiceItem.objects.filter(invoice__branch=my_branch)
                 .values("product__name")
-                .annotate(total_orders=Sum("quantity")).annotate(total_sales=Sum(
+                .annotate(total_orders=Sum("quantity"))
+                .annotate(
+                    total_sales=Sum(
                         ExpressionWrapper(
                             F("quantity") * F("unit_price") - F("discount_amount"),
                             output_field=DecimalField(max_digits=10, decimal_places=2),
-                        )))
+                        )
+                    )
+                )
                 .order_by("-total_orders")[:5]
             )
 
@@ -503,7 +511,7 @@ class ReportDashboardViewClass(APIView):
                     "Weekly_sales": days,
                     "Hourly_sales": hourly_sales_list,
                     "avg_order_month": avg_order_month,
-                    "top_selling_items_count":top_selling_items_count,
+                    "top_selling_items_count": top_selling_items_count,
                     "growth_percent": growth_percent,
                 }
             )

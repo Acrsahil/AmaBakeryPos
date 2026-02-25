@@ -178,15 +178,15 @@ export default function AdminReports() {
           <div className="card-elevated p-6 relative overflow-hidden">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-lg font-semibold">Today's Sales Trend</h3>
-                <p className="text-xs text-muted-foreground">Hourly performance (8 AM - 8 PM)</p>
+                <h3 className="text-lg font-semibold">Weekly Sales Trend</h3>
+                <p className="text-xs text-muted-foreground">Performance overview for the current week</p>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm">Today</Button>
+                <Button variant="outline" size="sm">This Week</Button>
               </div>
             </div>
             <ResponsiveContainer width="100%" height={350}>
-              <AreaChart data={hourlyChartData}>
+              <AreaChart data={weeklyChartData}>
                 <defs>
                   <linearGradient id="colorSalesReports" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -195,7 +195,7 @@ export default function AdminReports() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                 <XAxis
-                  dataKey="hour"
+                  dataKey="day"
                   stroke="hsl(var(--muted-foreground))"
                   fontSize={11}
                   axisLine={false}
