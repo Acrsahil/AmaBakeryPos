@@ -19,10 +19,15 @@ import {
     CheckCircle2,
     XCircle,
     Tag,
-    Store
+    Store,
+    Check,
+    ChevronsUpDown
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchCategories, createCategory, deleteCategory, updateCategory } from "../../api/index.js";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 interface Product {
     id: number;
@@ -61,6 +66,9 @@ export default function AdminMenu() {
     const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
     const [editingCategoryName, setEditingCategoryName] = useState("");
     const [formAvailable, setFormAvailable] = useState(true);
+    const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+    const [catSearchOpen, setCatSearchOpen] = useState(false);
+    const [catSearchValue, setCatSearchValue] = useState("");
 
     useEffect(() => {
         loadData();
@@ -128,9 +136,15 @@ export default function AdminMenu() {
             selling_price: formData.get("selling_price"),
             product_quantity: 0,
             low_stock_bar: 0,
-            category: parseInt(formData.get("category") as string),
+            category: selectedCategoryId,
             is_available: formAvailable
         };
+
+        if (!selectedCategoryId) {
+            toast.error("Please select a category");
+            setSubmitting(false);
+            return;
+        }
 
         try {
             if (editItem) {
@@ -232,7 +246,9 @@ export default function AdminMenu() {
                         <DialogTrigger asChild>
                             <Button size="sm" className="w-full sm:w-auto font-bold" onClick={() => {
                                 setEditItem(null);
+                                setSelectedCategoryId(null);
                                 setFormAvailable(true);
+                                setCatSearchValue("");
                             }}>
                                 <Plus className="h-4 w-4 mr-2" />
                                 Add Item
@@ -256,16 +272,77 @@ export default function AdminMenu() {
                                 <div className="grid grid-cols-2 gap-4 items-end">
                                     <div className="space-y-2">
                                         <Label htmlFor="category" className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Category</Label>
-                                        <Select name="category" defaultValue={editItem?.category?.toString()}>
-                                            <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-primary/20">
-                                                <SelectValue placeholder="Select category" />
-                                            </SelectTrigger>
-                                            <SelectContent className="rounded-2xl border-none shadow-2xl">
-                                                {categories.map(cat => (
-                                                    <SelectItem key={cat.id} value={cat.id.toString()} className="rounded-xl my-1">{cat.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <Popover open={catSearchOpen} onOpenChange={setCatSearchOpen}>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    role="combobox"
+                                                    aria-expanded={catSearchOpen}
+                                                    className="w-full h-12 justify-between rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 font-medium px-4"
+                                                >
+                                                    {selectedCategoryId
+                                                        ? categories.find((cat) => cat.id === selectedCategoryId)?.name
+                                                        : "Select category..."}
+                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-full p-0 rounded-2xl border-none shadow-2xl overflow-hidden z-[110]">
+                                                <Command className="border-none">
+                                                    <CommandInput
+                                                        placeholder="Search category..."
+                                                        value={catSearchValue}
+                                                        onValueChange={setCatSearchValue}
+                                                    />
+                                                    <CommandList className="max-h-[250px] scrollbar-hide">
+                                                        <CommandEmpty className="p-2">
+                                                            <div className="py-2 px-1 text-sm text-slate-500">No category found.</div>
+                                                            <Button
+                                                                type="button"
+                                                                variant="secondary"
+                                                                size="sm"
+                                                                className="w-full mt-2 rounded-xl h-10 font-bold bg-primary/10 text-primary hover:bg-primary/20"
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const response = await createCategory({ name: catSearchValue.trim() });
+                                                                        const newCat = response.data;
+                                                                        setCategories(prev => [...prev, newCat].sort((a, b) => a.name.localeCompare(b.name)));
+                                                                        setSelectedCategoryId(newCat.id);
+                                                                        setCatSearchOpen(false);
+                                                                        setCatSearchValue("");
+                                                                        toast.success(`Category "${newCat.name}" added`);
+                                                                    } catch (err: any) {
+                                                                        toast.error(err.message || "Failed to add category");
+                                                                    }
+                                                                }}
+                                                            >
+                                                                Add "{catSearchValue}"
+                                                            </Button>
+                                                        </CommandEmpty>
+                                                        <CommandGroup>
+                                                            {categories.map((cat) => (
+                                                                <CommandItem
+                                                                    key={cat.id}
+                                                                    value={cat.name}
+                                                                    className="rounded-xl mx-2 my-1"
+                                                                    onSelect={() => {
+                                                                        setSelectedCategoryId(cat.id);
+                                                                        setCatSearchOpen(false);
+                                                                    }}
+                                                                >
+                                                                    <Check
+                                                                        className={cn(
+                                                                            "mr-2 h-4 w-4",
+                                                                            selectedCategoryId === cat.id ? "opacity-100" : "opacity-0"
+                                                                        )}
+                                                                    />
+                                                                    {cat.name}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </PopoverContent>
+                                        </Popover>
                                     </div>
                                     <div className="flex items-center space-x-3 pb-2.5 pl-2">
                                         <Switch
@@ -431,8 +508,10 @@ export default function AdminMenu() {
                                                 className="h-9 w-9 text-slate-400 hover:text-primary hover:bg-primary/5 transition-colors"
                                                 onClick={() => {
                                                     setEditItem(item);
+                                                    setSelectedCategoryId(item.category);
                                                     setFormAvailable(item.is_available);
                                                     setIsDialogOpen(true);
+                                                    setCatSearchValue("");
                                                 }}
                                             >
                                                 <Pencil className="h-4 w-4" />
