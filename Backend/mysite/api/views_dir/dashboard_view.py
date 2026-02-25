@@ -6,6 +6,7 @@ from django.db.models.functions import (
     ExtractWeek,
     ExtractWeekDay,
     ExtractYear,
+    ExtractHour,
     TruncHour,
 )
 from django.utils import timezone
@@ -219,6 +220,16 @@ class DashboardViewClass(APIView):
                 .annotate(total_orders=Sum("quantity"))
                 .order_by("-total_orders")[:5]
             )
+            # bar chart for hourly 
+            orders_per_hour = today_invoices.annotate(
+                    hour=ExtractHour("created_at"),
+                ).values("hour").annotate(total_orders=Count("id"))
+            # print("aaja ko invoices ma k k xa???",today_invoices.count())
+            # invoice = Invoice.objects.get(id=1)
+            # print("date kati ko xa heram na tw??",invoice.created_at)
+            
+            # for order in orders_per_hour:
+            #     print(order)
 
             return Response(
                 {
@@ -230,6 +241,7 @@ class DashboardViewClass(APIView):
                     "avg_orders": today_avg_order,
                     "avg_order_percent": avg_order_percent,
                     "peak_hours": formatted_peak_hours,
+                    "orders_per_hour":orders_per_hour,
                     "total_sales_per_category": total_sales_per_category,
                     "top_selling_items": top_selling_items,
                 }
