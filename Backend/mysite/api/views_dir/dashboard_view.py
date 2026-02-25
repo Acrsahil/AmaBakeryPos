@@ -6,6 +6,7 @@ from django.db.models.functions import (
     ExtractWeek,
     ExtractWeekDay,
     ExtractYear,
+    ExtractHour,
     TruncHour,
 )
 from django.utils import timezone
@@ -106,6 +107,27 @@ class DashboardViewClass(APIView):
                     elif item["weekday"] == 1:
                         days["sunday"] = item["total_sales"]
 
+                # Hourly sales for today (8am to 8pm) - Global
+                hourly_data_global = (
+                    Invoice.objects.filter(
+                        created_at__date=today,
+                    )
+                    .annotate(hour=ExtractHour("created_at"))
+                    .values("hour")
+                    .annotate(total_sales=Sum("total_amount"))
+                )
+
+                hourly_sales_global = []
+                for h in range(8, 21):
+                    label = f"{h if h <= 12 else h-12} {'AM' if h < 12 else 'PM'}"
+                    if h == 12: label = "12 PM"
+                    sales_val = 0
+                    for item in hourly_data_global:
+                        if item["hour"] == h:
+                            sales_val = float(item["total_sales"] or 0)
+                            break
+                    hourly_sales_global.append({"hour": label, "sales": sales_val})
+
                 return Response(
                     {
                         "success": True,
@@ -115,6 +137,7 @@ class DashboardViewClass(APIView):
                         "total_count_order": total_count_order,
                         "average_order_value": average,
                         "Weekely_Sales": days,
+                        "Hourly_sales": hourly_sales_global,
                     },
                     status=status.HTTP_200_OK,
                 )
@@ -266,6 +289,28 @@ class DashboardViewClass(APIView):
                 elif item["weekday"] == 1:
                     branch_days["sunday"] = item["total_sales"]
 
+            # 8. Hourly sales for today (8am to 8pm) - Branch specific
+            hourly_data_branch = (
+                Invoice.objects.filter(
+                    branch=my_branch,
+                    created_at__date=today,
+                )
+                .annotate(hour=ExtractHour("created_at"))
+                .values("hour")
+                .annotate(total_sales=Sum("total_amount"))
+            )
+
+            hourly_sales_branch = []
+            for h in range(8, 21):
+                label = f"{h if h <= 12 else h-12} {'AM' if h < 12 else 'PM'}"
+                if h == 12: label = "12 PM"
+                sales_val = 0
+                for item in hourly_data_branch:
+                    if item["hour"] == h:
+                        sales_val = float(item["total_sales"] or 0)
+                        break
+                hourly_sales_branch.append({"hour": label, "sales": sales_val})
+
             return Response(
                 {
                     "success": True,
@@ -279,6 +324,7 @@ class DashboardViewClass(APIView):
                     "total_sales_per_category": total_sales_per_category,
                     "top_selling_items": top_selling_items,
                     "Weekely_Sales": branch_days,
+                    "Hourly_sales": hourly_sales_branch,
                 }
             )
 
@@ -413,6 +459,31 @@ class ReportDashboardViewClass(APIView):
                     days["sunday"] = item["total_sales"]
 
 
+            # Hourly sales for today (8am to 8pm)
+            hourly_data_raw = (
+                Invoice.objects.filter(
+                    branch=my_branch,
+                    created_at__date=today,
+                )
+                .annotate(hour=ExtractHour("created_at"))
+                .values("hour")
+                .annotate(total_sales=Sum("total_amount"))
+            )
+
+            # Initialize hours 8am to 8pm as a list for charts
+            hourly_sales_list = []
+            for h in range(8, 21):
+                label = f"{h if h <= 12 else h-12} {'AM' if h < 12 else 'PM'}"
+                if h == 12: label = "12 PM"
+                
+                sales_val = 0
+                for item in hourly_data_raw:
+                    if item["hour"] == h:
+                        sales_val = float(item["total_sales"] or 0)
+                        break
+                hourly_sales_list.append({"hour": label, "sales": sales_val})
+
+
             top_selling_items_count = (
                 InvoiceItem.objects.filter(invoice__branch=my_branch)
                 .values("product__name")
@@ -424,14 +495,13 @@ class ReportDashboardViewClass(APIView):
                 .order_by("-total_orders")[:5]
             )
 
-           
-
             return Response(
                 {
                     "success": True,
                     "total_month_sales": current_month_sales,
                     "total_month_orders": total_orders.count(),
                     "Weekly_sales": days,
+                    "Hourly_sales": hourly_sales_list,
                     "avg_order_month": avg_order_month,
                     "top_selling_items_count":top_selling_items_count,
                     "growth_percent": growth_percent,
