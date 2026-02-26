@@ -2,5 +2,3 @@ Enhanced Dashboard HQ super Admin "Weekly Sales Trend" chart
 Removed hidden notification and logout icon
 Enhance Change password hover on counter and kitchen
 Enhance logout icon in kitchen
-
-

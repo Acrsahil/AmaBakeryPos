@@ -163,20 +163,17 @@ export default function SuperAdminOverview() {
     const activeBranches = branches.filter(b => (b.status || 'active') === 'active').length;
 
     const handleAccessBranch = (branch: Branch) => {
-        // Find an admin for this branch in mock data for now, since we don't have a fetchUsersByBranch API yet
-        const branchAdmin = mockUsers.find(u => String(u.branchId) === String(branch.id) && u.role === 'admin');
+        // For SuperAdmins, we set a temporary branch scope instead of full impersonation
+        localStorage.setItem('selectedBranch', JSON.stringify({
+            id: branch.id,
+            name: branch.name
+        }));
 
-        if (branchAdmin) {
-            localStorage.setItem('currentUser', JSON.stringify(branchAdmin));
-            toast.success(`Accessing ${branch.name} Admin Portal`, {
-                description: `Logged in as ${branchAdmin.name}`,
-            });
-            navigate('/admin/dashboard');
-        } else {
-            toast.error("Access Denied", {
-                description: "No admin account found for this branch in our records.",
-            });
-        }
+        toast.success(`Accessing ${branch.name} Dashboard`, {
+            description: "You are now viewing branch-specific data.",
+        });
+
+        navigate('/admin/dashboard');
     };
 
     return (
