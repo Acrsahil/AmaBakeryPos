@@ -8,18 +8,33 @@ let _accessToken = null;
 // Helper to save tokens
 function saveTokens(tokens) {
   _accessToken = tokens.access;
-  if (tokens.refresh) {
-    localStorage.setItem("refresh", tokens.refresh);
-  }
 }
 
 // Clear tokens (logout)
-export function clearTokens() {
+export async function clearTokens() {
+  // Clear local state first
   _accessToken = null;
-  localStorage.removeItem("refresh");
   localStorage.removeItem("currentUser");
   localStorage.removeItem("currentWaiter");
+
+  // Also call backend logout to clear cookie
+  try {
+    const response = await fetch(apiBaseUrl + "/api/logout/", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    if (!response.ok) {
+      console.warn("Backend logout returned non-OK status");
+    }
+  } catch (err) {
+    console.error("Logout API call failed:", err);
+  }
 }
+
+
 
 // Get the current access token
 export function getAccessToken() {
@@ -28,44 +43,40 @@ export function getAccessToken() {
 
 // Refresh the access token
 export async function refreshAccessToken() {
-  const refreshToken = localStorage.getItem("refresh");
-  if (!refreshToken) throw new Error("No refresh token available");
-
   const url = apiBaseUrl + "/api/token/refresh/";
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh: refreshToken }),
+    credentials: "include" // This is key to send the refresh cookie
   });
 
   if (!res.ok) {
-    clearTokens();
+    _accessToken = null;
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("currentWaiter");
     throw new Error("Session expired. Please login again.");
   }
 
   const data = await res.json();
   _accessToken = data.access;
-  // Note: some systems return a new refresh token too
-  if (data.refresh) {
-    localStorage.setItem("refresh", data.refresh);
-  }
   return _accessToken;
 }
+
 
 // Check if we have a session to restore
 export async function initializeAuth() {
   if (_accessToken) return true;
-  const refreshToken = localStorage.getItem("refresh");
-  if (!refreshToken) return false;
 
   try {
+    // Attempt to refresh using cookie
     await refreshAccessToken();
     return true;
   } catch (err) {
-    console.error("Auth initialization failed:", err);
+    // No valid refresh cookie or refresh failed
     return false;
   }
 }
+
 
 // --- SECURE FETCHER ---
 // This wrapper handles:
@@ -89,12 +100,14 @@ async function apiFetch(endpoint, options = {}) {
   const fetchOptions = {
     ...options,
     headers,
+    credentials: "include", // Always include cookies
   };
 
   let response = await fetch(url, fetchOptions);
 
   // If 401 Unauthorized, try to refresh token once
-  if (response.status === 401) {
+  // EXCEPTION: Don't try to refresh if we're actually TRYING to login
+  if (response.status === 401 && !endpoint.includes("/api/token/")) {
     console.warn("Access token expired, attempting refresh...");
     try {
       const newToken = await refreshAccessToken();
@@ -104,11 +117,10 @@ async function apiFetch(endpoint, options = {}) {
       response = await fetch(url, fetchOptions);
     } catch (refreshErr) {
       console.error("Refresh failed:", refreshErr);
-      // If refresh fails, we're done. Let the 401 through or throw.
-      // Usually better to let the app handle the re-login.
       window.dispatchEvent(new CustomEvent("unauthorized"));
     }
   }
+
 
   return response;
 }
@@ -146,16 +158,47 @@ export async function loginUsers(username, password) {
 
   const data = await safeJson(res);
   if (!res.ok) {
-    throw new Error(data?.detail || data?.message || "Invalid username or password");
+    // Return specific error message from server if possible
+    throw new Error(data?.detail || data?.message || (data?.non_field_errors ? data.non_field_errors[0] : "Invalid username or password"));
   }
 
-  if (!data?.access || !data?.refresh) {
-    throw new Error("Login response missing tokens.");
+  if (!data?.access) {
+    throw new Error("Login response missing access token.");
   }
 
   saveTokens(data);
   return data;
 }
+
+export async function changePassword(oldPassword, newPassword) {
+  const res = await apiFetch("/api/change-password/", {
+    method: "POST",
+    body: JSON.stringify({
+      old_password: oldPassword,
+      new_password: newPassword
+    }),
+  });
+  const data = await safeJson(res);
+  if (!res.ok) {
+    throw new Error(data?.message || JSON.stringify(data?.errors) || "Failed to change password");
+  }
+  return data;
+}
+
+export async function adminResetPassword(userId, newPassword) {
+  const res = await apiFetch(`/api/admin-reset-password/${userId}/`, {
+    method: "POST",
+    body: JSON.stringify({
+      new_password: newPassword
+    }),
+  });
+  const data = await safeJson(res);
+  if (!res.ok) {
+    throw new Error(data?.message || "Failed to reset password");
+  }
+  return data;
+}
+
 
 export async function fetchMe() {
   const res = await apiFetch("/api/me/");

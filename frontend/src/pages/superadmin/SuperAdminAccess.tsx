@@ -14,7 +14,10 @@ import {
     User
 } from "lucide-react";
 import { fetchUsers, createUser, updateUser, deleteUser, fetchBranches } from "../../api/index.js";
+import { ResetPasswordModal } from "../../components/auth/ResetPasswordModal";
+import { KeyRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -58,15 +61,18 @@ export default function SuperAdminAccess() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const [editUser, setEditUser] = useState<UserData | null>(null);
+    const [resetTargetUser, setResetTargetUser] = useState<UserData | null>(null);
     const [submitting, setSubmitting] = useState(false);
+
 
     const [form, setForm] = useState({
         full_name: "",
         username: "",
         email: "",
         phone: "",
-        password: "",
+        password: "amabakery@123",
         user_type: "BRANCH_MANAGER",
         branch: ""
     });
@@ -98,7 +104,7 @@ export default function SuperAdminAccess() {
             username: "",
             email: "",
             phone: "",
-            password: "",
+            password: "amabakery@123",
             user_type: "BRANCH_MANAGER",
             branch: ""
         });
@@ -218,7 +224,11 @@ export default function SuperAdminAccess() {
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
                                 {filteredUsers.map((user) => (
-                                    <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
+                                    <tr
+                                        key={user.id}
+                                        className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                                        onClick={() => handleOpenEdit(user)}
+                                    >
                                         <td className="px-6 py-5">
                                             <div className="flex items-center gap-3">
                                                 <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold border border-slate-200 shadow-sm">
@@ -251,21 +261,28 @@ export default function SuperAdminAccess() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-5 text-right">
-                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center justify-end gap-3">
                                                 <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-9 w-9 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-primary transition-all"
-                                                    onClick={() => handleOpenEdit(user)}
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8 px-3 text-[10px] font-black uppercase tracking-widest border-amber-200 text-amber-600 hover:bg-amber-50 hover:text-amber-700 transition-all"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setResetTargetUser(user);
+                                                        setIsResetModalOpen(true);
+                                                    }}
                                                 >
-                                                    <Pencil className="h-4 w-4" />
+                                                    Reset Password
                                                 </Button>
                                                 {user.user_type !== 'ADMIN' && (
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="h-9 w-9 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all"
-                                                        onClick={() => handleDelete(user)}
+                                                        className="h-9 w-9 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDelete(user);
+                                                        }}
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -274,11 +291,22 @@ export default function SuperAdminAccess() {
                                         </td>
                                     </tr>
                                 ))}
+
                             </tbody>
                         </table>
                     )}
                 </div>
             </div>
+
+            <ResetPasswordModal
+                isOpen={isResetModalOpen}
+                onClose={() => {
+                    setIsResetModalOpen(false);
+                    setResetTargetUser(null);
+                }}
+                user={resetTargetUser}
+            />
+
 
             {/* Manager Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

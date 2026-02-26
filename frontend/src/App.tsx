@@ -47,6 +47,8 @@ const queryClient = new QueryClient();
 
 import { isLoggedIn, getCurrentUser } from "./auth/auth";
 import { GlobalLogout } from "@/components/ui/GlobalLogout";
+import { initializeAuth } from "./api";
+import { useState, useEffect } from "react";
 
 const roleRedirectPath = (role?: string) => {
   switch (role) {
@@ -92,138 +94,165 @@ const ProtectedRoute = ({
   return children;
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner position="top-center" />
-      <BrowserRouter>
-        <GlobalLogout />
-        <Routes>
-          {/* ✅ MAIN ENTRY */}
-          <Route path="/" element={<HomeRedirect />} />
+const App = () => {
+  const [initializing, setInitializing] = useState(true);
 
-          {/* ✅ LOGIN */}
-          <Route path="/login" element={<Login />} />
+  useEffect(() => {
+    const init = async () => {
+      try {
+        await initializeAuth();
+      } finally {
+        setInitializing(false);
+      }
+    };
+    init();
+  }, []);
 
-          {/* ✅ SUPER ADMIN LOGIN (optional separate page) */}
-          <Route path="/super-admin" element={<SuperAdminLogin />} />
+  if (initializing) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-gradient-cream">
+        <div className="h-20 w-20 bg-primary rounded-3xl shadow-xl flex items-center justify-center animate-bounce mb-4 text-white">
+          <img src="/logos/logo1white.jfif" alt="Logo" className="w-12 h-12 object-contain" />
+        </div>
+        <p className="font-black text-slate-400 uppercase tracking-[0.3em] text-[10px] animate-pulse">Initializing Secure Session</p>
+      </div>
+    );
+  }
 
-          {/* ✅ SUPER ADMIN PROTECTED */}
-          <Route
-            element={
-              <ProtectedRoute allowedRoles={["ADMIN"]}>
-                <SuperAdminLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/super-admin/dashboard" element={<SuperAdminOverview />} />
-            <Route path="/super-admin/branches" element={<SuperAdminBranches />} />
-            <Route path="/super-admin/analytics" element={<SuperAdminAnalytics />} />
-            <Route path="/super-admin/access" element={<SuperAdminAccess />} />
-          </Route>
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner position="top-center" />
+        <BrowserRouter>
+          <GlobalLogout />
 
-          {/* ✅ WAITER PROTECTED */}
-          <Route
-            path="/waiter/tables"
-            element={
-              <ProtectedRoute allowedRoles={["WAITER"]}>
-                <TableSelection />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/waiter/order/:tableNumber"
-            element={
-              <ProtectedRoute allowedRoles={["WAITER"]}>
-                <OrderEntry />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/waiter/checkout"
-            element={
-              <ProtectedRoute allowedRoles={["WAITER"]}>
-                <Checkout />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/waiter/orders"
-            element={
-              <ProtectedRoute allowedRoles={["WAITER"]}>
-                <OrderStatus />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/waiter/payment"
-            element={
-              <ProtectedRoute allowedRoles={["WAITER"]}>
-                <PaymentCollection />
-              </ProtectedRoute>
-            }
-          />
+          <Routes>
+            {/* ✅ MAIN ENTRY */}
+            <Route path="/" element={<HomeRedirect />} />
 
-          {/* ✅ COUNTER PROTECTED */}
-          <Route
-            path="/counter/pos"
-            element={
-              <ProtectedRoute allowedRoles={["COUNTER", "BRANCH_MANAGER", "ADMIN"]}>
-                <CounterPOS />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/counter/orders"
-            element={
-              <ProtectedRoute allowedRoles={["COUNTER"]}>
-                <CounterOrders />
-              </ProtectedRoute>
-            }
-          />
+            {/* ✅ LOGIN */}
+            <Route path="/login" element={<Login />} />
 
-          {/* ✅ KITCHEN PROTECTED */}
-          <Route
-            path="/kitchen/display"
-            element={
-              <ProtectedRoute allowedRoles={["KITCHEN"]}>
-                <KitchenDisplay />
-              </ProtectedRoute>
-            }
-          />
+            {/* ✅ SUPER ADMIN LOGIN (optional separate page) */}
+            <Route path="/super-admin" element={<SuperAdminLogin />} />
 
-          {/* ✅ ADMIN PROTECTED (nested layout stays working) */}
-          <Route
-            path="/admin/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={["BRANCH_MANAGER"]}>
-                <AdminLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<AdminDashboard />} />
-            <Route path="orders" element={<AdminOrders />} />
-            <Route path="menu" element={<AdminMenu />} />
-            <Route path="inventory" element={<AdminInventory />} />
-            <Route path="customers" element={<AdminCustomers />} />
-            <Route path="users" element={<AdminUsers />} />
-            <Route path="reports" element={<AdminReports />} />
-            <Route path="tables" element={<AdminTables />} />
-          </Route>
+            {/* ✅ SUPER ADMIN PROTECTED */}
+            <Route
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <SuperAdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/super-admin/dashboard" element={<SuperAdminOverview />} />
+              <Route path="/super-admin/branches" element={<SuperAdminBranches />} />
+              <Route path="/super-admin/analytics" element={<SuperAdminAnalytics />} />
+              <Route path="/super-admin/access" element={<SuperAdminAccess />} />
+            </Route>
 
-          {/* Optional: redirect base role paths */}
-          <Route path="/waiter" element={<Navigate to="/waiter/tables" replace />} />
-          <Route path="/counter" element={<Navigate to="/counter/orders" replace />} />
-          <Route path="/kitchen" element={<Navigate to="/kitchen/display" replace />} />
-          <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            {/* ✅ WAITER PROTECTED */}
+            <Route
+              path="/waiter/tables"
+              element={
+                <ProtectedRoute allowedRoles={["WAITER"]}>
+                  <TableSelection />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/waiter/order/:tableNumber"
+              element={
+                <ProtectedRoute allowedRoles={["WAITER"]}>
+                  <OrderEntry />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/waiter/checkout"
+              element={
+                <ProtectedRoute allowedRoles={["WAITER"]}>
+                  <Checkout />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/waiter/orders"
+              element={
+                <ProtectedRoute allowedRoles={["WAITER"]}>
+                  <OrderStatus />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/waiter/payment"
+              element={
+                <ProtectedRoute allowedRoles={["WAITER"]}>
+                  <PaymentCollection />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* 404 */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+            {/* ✅ COUNTER PROTECTED */}
+            <Route
+              path="/counter/pos"
+              element={
+                <ProtectedRoute allowedRoles={["COUNTER", "BRANCH_MANAGER", "ADMIN"]}>
+                  <CounterPOS />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/counter/orders"
+              element={
+                <ProtectedRoute allowedRoles={["COUNTER"]}>
+                  <CounterOrders />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ KITCHEN PROTECTED */}
+            <Route
+              path="/kitchen/display"
+              element={
+                <ProtectedRoute allowedRoles={["KITCHEN"]}>
+                  <KitchenDisplay />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ ADMIN PROTECTED (nested layout stays working) */}
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute allowedRoles={["BRANCH_MANAGER"]}>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<AdminDashboard />} />
+              <Route path="orders" element={<AdminOrders />} />
+              <Route path="menu" element={<AdminMenu />} />
+              <Route path="inventory" element={<AdminInventory />} />
+              <Route path="customers" element={<AdminCustomers />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="reports" element={<AdminReports />} />
+              <Route path="tables" element={<AdminTables />} />
+            </Route>
+
+            {/* Optional: redirect base role paths */}
+            <Route path="/waiter" element={<Navigate to="/waiter/tables" replace />} />
+            <Route path="/counter" element={<Navigate to="/counter/orders" replace />} />
+            <Route path="/kitchen" element={<Navigate to="/kitchen/display" replace />} />
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+
+            {/* 404 */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

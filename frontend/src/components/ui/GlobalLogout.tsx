@@ -1,5 +1,8 @@
-import { LogOut } from "lucide-react";
+import { LogOut, ShieldCheck } from "lucide-react";
 import { logout, isLoggedIn, getCurrentUser } from "@/auth/auth";
+import { ChangePasswordModal } from "../auth/ChangePasswordModal";
+
+
 import { useLocation } from "react-router-dom";
 import {
     AlertDialog,
@@ -16,7 +19,9 @@ import { useState, useEffect } from "react";
 export function GlobalLogout() {
     const location = useLocation();
     const [showConfirm, setShowConfirm] = useState(false);
+    const [showChangePassword, setShowChangePassword] = useState(false);
     const isLoginPage = location.pathname === "/login" || location.pathname === "/super-admin";
+
 
     // Handle unauthorized event from api/index.js
     useEffect(() => {
@@ -38,7 +43,14 @@ export function GlobalLogout() {
     return (
         <>
             {!hideFloating && (
-                <div className="fixed top-3 right-4 z-[100] no-print">
+                <div className="fixed top-3 right-4 z-[100] no-print flex gap-2">
+                    <button
+                        onClick={() => setShowChangePassword(true)}
+                        className="flex items-center justify-center h-10 w-10 rounded-full bg-white border border-slate-100 hover:bg-slate-50 transition-all group shadow-none"
+                        title="Change Password"
+                    >
+                        <ShieldCheck className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
+                    </button>
                     <button
                         onClick={() => setShowConfirm(true)}
                         className="flex items-center justify-center h-10 w-10 rounded-full bg-white border border-slate-100 hover:bg-slate-50 transition-all group shadow-none"
@@ -48,6 +60,12 @@ export function GlobalLogout() {
                     </button>
                 </div>
             )}
+
+            <ChangePasswordModal
+                isOpen={showChangePassword}
+                onClose={() => setShowChangePassword(false)}
+            />
+
 
             <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
                 <AlertDialogContent className="rounded-3xl border-none shadow-2xl max-w-[320px]">

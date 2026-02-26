@@ -8,6 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Pencil, Trash2, User, Shield, ChefHat, UtensilsCrossed, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchUsers, createUser, updateUser, deleteUser } from "../../api/index.js";
+import { ResetPasswordModal } from "../../components/auth/ResetPasswordModal";
+import { KeyRound } from "lucide-react";
+import { getCurrentUser } from "@/auth/auth";
+
 
 
 interface UserType {
@@ -38,9 +42,22 @@ export default function AdminUsers() {
   const [userList, setUserList] = useState<UserType[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserType | null>(null);
+  const [resetTargetUser, setResetTargetUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const currentUser = getCurrentUser();
+
+  const canResetPassword = (targetRole: string) => {
+    if (!currentUser?.role) return false;
+    if (currentUser.role === 'ADMIN') return true;
+    if (currentUser.role === 'BRANCH_MANAGER') {
+      return ['WAITER', 'COUNTER', 'KITCHEN'].includes(targetRole);
+    }
+    return false;
+  };
+
 
   useEffect(() => {
     loadUsers();
@@ -167,6 +184,7 @@ export default function AdminUsers() {
                     id="password"
                     name="password"
                     type="password"
+                    defaultValue="amabakery@123"
                     placeholder="••••••••"
                   />
                 </div>
@@ -245,7 +263,14 @@ export default function AdminUsers() {
                 const isWaiter = user.user_type === 'WAITER';
 
                 return (
-                  <tr key={user.id} className="hover:bg-slate-50 transition-colors group">
+                  <tr
+                    key={user.id}
+                    className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                    onClick={() => {
+                      setEditUser(user);
+                      setIsDialogOpen(true);
+                    }}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${roleColors[user.user_type]} shadow-sm`}>
@@ -272,34 +297,51 @@ export default function AdminUsers() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="flex justify-center items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-center items-center gap-3">
+                        {canResetPassword(user.user_type) && user.id !== currentUser?.id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-3 text-[10px] font-black uppercase tracking-widest border-amber-200 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setResetTargetUser(user);
+                              setIsResetModalOpen(true);
+                            }}
+                          >
+                            Reset Password
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 hover:bg-slate-200"
-                          onClick={() => {
-                            setEditUser(user);
-                            setIsDialogOpen(true);
+                          className="h-8 w-8 p-0 hover:bg-red-50 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(user.id);
                           }}
-                        >
-                          <Pencil className="h-3.5 w-3.5 text-slate-600" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-red-50 text-destructive"
-                          onClick={() => handleDelete(user.id)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </td>
                   </tr>
+
                 );
               })}
             </tbody>
           </table>
         </div>
+
+        <ResetPasswordModal
+          isOpen={isResetModalOpen}
+          onClose={() => {
+            setIsResetModalOpen(false);
+            setResetTargetUser(null);
+          }}
+          user={resetTargetUser}
+        />
+
 
         {filteredUsers.length === 0 && (
           <div className="py-20 text-center">

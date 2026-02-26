@@ -7,9 +7,13 @@ import {
     Users,
     Settings,
     LogOut,
-    Monitor
+    Monitor,
+    Shield
 } from "lucide-react";
 import { logout } from "../../auth/auth";
+import { ChangePasswordModal } from "../auth/ChangePasswordModal";
+import { useState } from "react";
+
 
 
 const navItems = [
@@ -28,6 +32,8 @@ interface SuperAdminSidebarProps {
 export function SuperAdminSidebar({ className, onNavigate }: SuperAdminSidebarProps) {
     const location = useLocation();
     const navigate = useNavigate();
+    const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+
 
     return (
         <div className={cn("flex h-full flex-col gradient-espresso text-sidebar-foreground", className)}>
@@ -67,6 +73,31 @@ export function SuperAdminSidebar({ className, onNavigate }: SuperAdminSidebarPr
                     );
                 })}
             </nav>
+
+            {/* Security Info */}
+            <div className="p-4 border-t border-sidebar-border space-y-2">
+                <button
+                    onClick={() => setIsResetModalOpen(true)}
+                    className="w-full flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all"
+                >
+                    <Shield className="h-5 w-5" />
+                    Change Password
+                </button>
+
+                <button
+                    onClick={() => logout()}
+                    className="w-full flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red-400 hover:bg-red-500/10 transition-all text-left"
+                >
+                    <LogOut className="h-5 w-5" />
+                    Sign Out
+                </button>
+            </div>
+
+            <ChangePasswordModal
+                isOpen={isResetModalOpen}
+                onClose={() => setIsResetModalOpen(false)}
+            />
         </div>
     );
 }
+
