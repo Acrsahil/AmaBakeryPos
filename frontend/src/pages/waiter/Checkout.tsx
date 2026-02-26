@@ -209,7 +209,7 @@ export default function Checkout() {
         }
     };
 
-    const submitInvoice = async (isPaid: boolean = false, paidAmount: number = 0) => {
+    const submitInvoice = async (isPaid: boolean = false, paidAmount: number = 0, method: string | null = null) => {
         setIsProcessing(true);
         const user = getCurrentUser();
 
@@ -224,7 +224,7 @@ export default function Checkout() {
                 tax_amount: taxAmount,
                 discount: discountAmount,
                 paid_amount: paidAmount,
-                payment_method: paymentMethod === 'qr' ? 'QR' : 'CASH',
+                payment_method: method,
                 items: state.cart.map(c => ({
                     item_type: "PRODUCT",
                     product: parseInt(c.item.id),
@@ -300,7 +300,7 @@ export default function Checkout() {
         }
 
         try {
-            await submitInvoice(true, total);
+            await submitInvoice(true, total, "CASH");
             const change = receivedAmount - total;
 
             toast.success("Payment Confirmed!", {
@@ -319,7 +319,7 @@ export default function Checkout() {
 
     const handleQRPayment = async () => {
         try {
-            await submitInvoice(true, total);
+            await submitInvoice(true, total, "QR");
             toast.success("Payment Confirmed!", {
                 description: `Table ${state?.tableNumber} - Rs.${total.toFixed(2)} paid via QR Code`,
                 icon: <CheckCircle2 className="h-5 w-5 text-success" />,
