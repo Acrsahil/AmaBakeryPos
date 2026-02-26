@@ -19,10 +19,14 @@ class ProductViewClass(APIView):
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
 
+
+
+
         # Support branch_id query parameter for global admins
         branch_id = request.query_params.get("branch_id") or request.query_params.get(
             "branch"
         )
+        
 
         if id:
             # get single product
@@ -47,9 +51,9 @@ class ProductViewClass(APIView):
 
             if role in ["ADMIN", "SUPER_ADMIN"]:
                 # If a branch filter is provided, use it
+                print("This is branch id->> ",branch_id)
                 if branch_id:
                     products = products.filter(branch_id=branch_id)
-                # Otherwise, return all (global view)
             else:
                 # Branch staff only see their own branch products
                 if my_branch:
