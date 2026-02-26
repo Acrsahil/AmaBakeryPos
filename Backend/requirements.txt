@@ -13,3 +13,4 @@ python-dotenv
 python-dateutil
 channels
 channels-redis
+daphne
