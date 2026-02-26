@@ -2,17 +2,16 @@ import { useState, useEffect } from "react";
 import { fetchReportDashboard, fetchStaffReport } from "@/api/index.js";
 import { getCurrentUser } from "../../auth/auth";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Download,
   FileText,
   TrendingUp,
-  Calendar,
-  Printer
+  Printer,
+  Loader2
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart,
   Bar,
@@ -156,7 +155,7 @@ export default function AdminReports() {
         <Card className="p-4 hover:shadow-warm-lg cursor-pointer transition-all">
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-xl bg-info/10 flex items-center justify-center">
-              <Calendar className="h-6 w-6 text-info" />
+              <FileText className="h-6 w-6 text-info" />
             </div>
             <div>
               <h3 className="font-semibold">Monthly Report</h3>

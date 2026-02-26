@@ -9,7 +9,6 @@ import {
     Plus,
     MapPin,
     ArrowUpRight,
-    Clock,
     MoreVertical,
     ExternalLink,
     Globe,
@@ -191,10 +190,6 @@ export default function SuperAdminOverview() {
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border text-sm shadow-sm">
-                        <Clock className="h-4 w-4 text-primary" />
-                        <span className="font-bold">Real-time Feed</span>
-                    </div>
                 </div>
             </div>
 

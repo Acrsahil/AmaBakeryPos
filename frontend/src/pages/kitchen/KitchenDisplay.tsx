@@ -8,7 +8,6 @@ import {
   LogOut,
   Bell,
   CheckCircle2,
-  Clock,
   RotateCcw,
   MapPin,
   Utensils,
@@ -28,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { getCurrentUser, logout } from "../../auth/auth";
+import { ChangePasswordModal } from "@/components/auth/ChangePasswordModal";
 import { fetchInvoices, fetchProducts, fetchCategories, updateInvoiceStatus, fetchTables } from "../../api/index.js";
 
 export default function KitchenDisplay() {
@@ -41,6 +41,7 @@ export default function KitchenDisplay() {
     if (stored === 'all' || !stored) return 'all';
     return Number(stored);
   });
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const handleFloorChange = (id: number | 'all') => {
@@ -87,7 +88,6 @@ export default function KitchenDisplay() {
             tableNumber,
             groupName,
             waiter: inv.created_by_name || "Unknown",
-            createdAt: inv.created_at ? new Date(inv.created_at) : new Date(),
             floor: inv.floor,
             floorName: inv.floor_name,
             status: inv.invoice_status === 'PENDING' ? 'new' :
@@ -254,6 +254,25 @@ export default function KitchenDisplay() {
           </div>
 
           <div className="flex items-center gap-8">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowChangePassword(true)}
+                className="text-slate-500 hover:text-primary font-bold transition-all px-3 hidden sm:flex"
+              >
+                Change Password
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => logout()}
+                className="h-10 w-10 text-red-500 hover:bg-red-50 rounded-full"
+                title="Logout"
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
               {/* Completed Orders Sheet */}
               <Sheet>
@@ -274,7 +293,7 @@ export default function KitchenDisplay() {
                   <div className="space-y-4">
                     {filteredOrders.filter(o => o.status === 'completed').length === 0 ? (
                       <div className="text-center py-12 text-slate-400">
-                        <Clock className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                        <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-20" />
                         <p>No completed orders yet today</p>
                       </div>
                     ) : (
@@ -290,8 +309,8 @@ export default function KitchenDisplay() {
                                 {order.floorName && <p className="text-[10px] font-black text-primary uppercase">{order.floorName}</p>}
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium text-slate-400 bg-white px-2 py-1 rounded border border-slate-100">
-                                  {new Date(order.createdAt).toLocaleTimeString()}
+                                <span className="text-xs font-black uppercase tracking-widest text-slate-400 bg-white px-2 py-1 rounded border border-slate-100">
+                                  COMPLETED
                                 </span>
                                 <Button
                                   variant="ghost"
@@ -322,7 +341,12 @@ export default function KitchenDisplay() {
             </div>
           </div>
         </div>
-      </header>
+      </header >
+
+      <ChangePasswordModal
+        isOpen={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+      />
 
       {/* Kanban Board */}
       <main className="flex-1 p-4 overflow-hidden relative">
@@ -401,6 +425,6 @@ export default function KitchenDisplay() {
           </div>
         </div>
       </main>
-    </div>
+    </div >
   );
 }

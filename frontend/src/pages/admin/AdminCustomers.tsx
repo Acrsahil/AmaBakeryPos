@@ -213,7 +213,7 @@ export default function AdminCustomers() {
                                 <th className="px-6 py-4">Contact</th>
                                 <th className="px-6 py-4">Total Orders</th>
                                 <th className="px-6 py-4">Total Spent</th>
-                                <th className="px-6 py-4">Joined / Last Activity</th>
+                                <th className="px-6 py-4">Status</th>
                                 <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -269,7 +269,7 @@ export default function AdminCustomers() {
                                             Rs.{customer.totalSpent.toLocaleString()}
                                         </td>
                                         <td className="px-6 py-4 text-muted-foreground truncate">
-                                            {customer.lastOrderDate}
+                                            <StatusBadge status="active" />
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
@@ -374,8 +374,8 @@ export default function AdminCustomers() {
                                             <span>{selectedCustomer.phone}</span>
                                         </div>
                                         <div className="flex items-center gap-3 text-sm">
-                                            <Calendar className="h-4 w-4 text-primary/70" />
-                                            <span>Joined: {selectedCustomer.lastOrderDate}</span>
+                                            <Users className="h-4 w-4 text-primary/70" />
+                                            <span>Active Customer</span>
                                         </div>
                                     </div>
                                 )}

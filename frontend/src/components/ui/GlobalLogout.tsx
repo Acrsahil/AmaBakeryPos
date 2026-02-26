@@ -1,5 +1,8 @@
 import { LogOut } from "lucide-react";
 import { logout, isLoggedIn, getCurrentUser } from "@/auth/auth";
+import { ChangePasswordModal } from "../auth/ChangePasswordModal";
+
+
 import { useLocation } from "react-router-dom";
 import {
     AlertDialog,
@@ -16,7 +19,9 @@ import { useState, useEffect } from "react";
 export function GlobalLogout() {
     const location = useLocation();
     const [showConfirm, setShowConfirm] = useState(false);
+    const [showChangePassword, setShowChangePassword] = useState(false);
     const isLoginPage = location.pathname === "/login" || location.pathname === "/super-admin";
+
 
     // Handle unauthorized event from api/index.js
     useEffect(() => {
@@ -33,12 +38,18 @@ export function GlobalLogout() {
 
     const user = getCurrentUser();
     // Hide floating button for Admin and HQ roles as they'll have it in the header
-    const hideFloating = user?.role === "ADMIN" || user?.role === "BRANCH_MANAGER";
+    const hideFloating = user?.role === "ADMIN" || user?.role === "BRANCH_MANAGER" || user?.role === "COUNTER" || user?.role === "KITCHEN";
 
     return (
         <>
             {!hideFloating && (
-                <div className="fixed top-3 right-4 z-[100] no-print">
+                <div className="fixed top-3 right-4 z-[100] no-print flex items-center gap-2">
+                    <button
+                        onClick={() => setShowChangePassword(true)}
+                        className="bg-white border border-slate-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-primary hover:border-primary transition-all shadow-sm"
+                    >
+                        Change Password
+                    </button>
                     <button
                         onClick={() => setShowConfirm(true)}
                         className="flex items-center justify-center h-10 w-10 rounded-full bg-white border border-slate-100 hover:bg-slate-50 transition-all group shadow-none"
@@ -48,6 +59,12 @@ export function GlobalLogout() {
                     </button>
                 </div>
             )}
+
+            <ChangePasswordModal
+                isOpen={showChangePassword}
+                onClose={() => setShowChangePassword(false)}
+            />
+
 
             <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
                 <AlertDialogContent className="rounded-3xl border-none shadow-2xl max-w-[320px]">

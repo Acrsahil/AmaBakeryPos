@@ -10,9 +10,13 @@ import {
   Settings,
   LogOut,
   ChefHat,
-  Monitor
+  Monitor,
+  Shield,
+  BarChart3
 } from "lucide-react";
 import { getCurrentUser, logout } from "../../auth/auth";
+import { useState } from "react";
+
 
 
 const navItems = [
@@ -23,6 +27,7 @@ const navItems = [
   { icon: Users, label: "Customers", path: "/admin/dashboard/customers" },
   { icon: ChefHat, label: "Staff", path: "/admin/dashboard/users" },
   { icon: FileBarChart, label: "Reports", path: "/admin/dashboard/reports" },
+  { icon: BarChart3, label: "Global Analytics", path: "/admin/dashboard/global-analytics" },
   { icon: UtensilsCrossed, label: "Table Management", path: "/admin/dashboard/tables" },
 ];
 
@@ -33,6 +38,7 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
   const location = useLocation();
+
 
   // Get current user and branch
   const user = getCurrentUser();
@@ -78,6 +84,19 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
           );
         })}
       </nav>
+
+      {/* Security Info */}
+      <div className="p-4 border-t border-sidebar-border space-y-2">
+        <button
+          onClick={() => {
+            if (confirm("Are you sure you want to log out?")) logout();
+          }}
+          className="w-full flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 transition-all"
+        >
+          <LogOut className="h-5 w-5" />
+          Logout
+        </button>
+      </div>
     </div>
   );
 }

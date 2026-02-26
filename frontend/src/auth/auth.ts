@@ -54,7 +54,7 @@ export function getCurrentUser() {
   return u ? JSON.parse(u) : null;
 }
 
-export function logout() {
-  clearTokens();
+export async function logout() {
+  await clearTokens();
   window.location.href = "/login";
 }

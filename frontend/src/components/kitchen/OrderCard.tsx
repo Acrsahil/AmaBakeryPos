@@ -1,8 +1,7 @@
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
-import { Clock, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDistanceToNow } from "date-fns";
 
 interface OrderCardProps {
   order: any;
@@ -29,7 +28,6 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
   };
 
   const nextStatus = getNextStatus();
-  const timeAgo = formatDistanceToNow(new Date(order.createdAt), { addSuffix: true });
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full hover:shadow-lg transition-all duration-300">
@@ -48,8 +46,7 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
           <span className="text-xs font-black text-slate-400">#{order.id.slice(-3)}</span>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-              <Clock className="h-3 w-3 opacity-60" />
-              <span>{timeAgo}</span>
+              <span>ACTIVE</span>
             </div>
             {order.waiter && (
               <div className="flex items-center gap-3">

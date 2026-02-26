@@ -17,6 +17,8 @@ import {
   HelpCircle
 } from "lucide-react";
 import { logout, getCurrentUser } from "@/auth/auth";
+import { ChangePasswordModal } from "../auth/ChangePasswordModal";
+import { useState } from "react";
 
 interface MobileHeaderProps {
   title: string;
@@ -27,6 +29,7 @@ interface MobileHeaderProps {
 
 export function MobileHeader({ title, showBack = false, showNotification = true, notificationCount = 0 }: MobileHeaderProps) {
   const navigate = useNavigate();
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   // Get current user and branch
   const user = getCurrentUser();
@@ -67,34 +70,21 @@ export function MobileHeader({ title, showBack = false, showNotification = true,
               )}
             </Button>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-10 w-10 bg-primary/10 text-primary hover:bg-primary/20 rounded-full transition-colors">
-                <UserIcon className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 mt-2 rounded-xl shadow-xl border-none p-2 animate-in fade-in zoom-in-95 duration-200">
-              <DropdownMenuLabel className="p-3">
-                <span className="font-black text-[10px] uppercase tracking-[0.2em] text-muted-foreground block mb-1">{userRole} Account</span>
-                <div className="flex flex-col">
-                  <span className="text-sm font-black text-foreground">{userName}</span>
-                  <span className="text-[10px] text-slate-400 font-bold italic">{branchName}</span>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-slate-100" />
-              <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors active:scale-95">
-                <Settings className="h-4 w-4 text-slate-500" />
-                <span className="font-semibold">Preferences</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors active:scale-95">
-                <HelpCircle className="h-4 w-4 text-slate-500" />
-                <span className="font-semibold">Help Support</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-slate-100" />
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => logout()}
+            className="h-10 w-10 text-red-500 hover:bg-red-50 rounded-full"
+            title="Logout"
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
         </div>
       </div>
+      <ChangePasswordModal
+        isOpen={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+      />
     </header>
   );
 }

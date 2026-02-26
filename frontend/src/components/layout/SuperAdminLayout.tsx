@@ -5,9 +5,11 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, LogOut, User as UserIcon, Shield } from "lucide-react";
 import { logout, getCurrentUser } from "@/auth/auth";
+import { ChangePasswordModal } from "../auth/ChangePasswordModal";
 
 export function SuperAdminLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const user = getCurrentUser();
 
     return (
@@ -35,19 +37,34 @@ export function SuperAdminLayout() {
                         </div>
                     </div>
                     <div className="h-8 w-px bg-slate-100" />
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                            if (confirm("Are you sure you want to log out from HQ?")) logout();
-                        }}
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50 font-bold gap-2 rounded-xl transition-all active:scale-95"
-                    >
-                        <LogOut className="h-4 w-4" />
-                        Logout
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsResetModalOpen(true)}
+                            className="text-slate-500 hover:text-primary font-bold transition-all px-3"
+                        >
+                            Change Password
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                if (confirm("Are you sure you want to log out from HQ?")) logout();
+                            }}
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50 font-bold gap-2 rounded-xl transition-all active:scale-95"
+                        >
+                            <LogOut className="h-4 w-4" />
+                            Logout
+                        </Button>
+                    </div>
                 </div>
             </header>
+
+            <ChangePasswordModal
+                isOpen={isResetModalOpen}
+                onClose={() => setIsResetModalOpen(false)}
+            />
 
             {/* Mobile Header */}
             <div className="md:hidden sticky top-0 z-50 flex items-center justify-between p-4 pr-14 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">

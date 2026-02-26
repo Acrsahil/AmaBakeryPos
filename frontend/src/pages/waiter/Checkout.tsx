@@ -19,7 +19,6 @@ import {
     MessageSquare,
     Printer,
     Wallet,
-    Clock,
     Banknote,
     QrCode,
     CreditCard,
@@ -158,10 +157,6 @@ export default function Checkout() {
             <div style="font-size:11px;font-weight:800;color:#1e293b;">#${orderId ? String(orderId).slice(-6).toUpperCase() : 'NEW'}</div>
         </div>
         <div style="text-align:right;">
-            <div style="font-size:8px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px;">Date &amp; Time</div>
-            <div style="font-size:10px;font-weight:700;color:#1e293b;">${new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })} • ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-        </div>
-        <div>
             <div style="font-size:8px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px;">Serving Location</div>
             <div style="font-size:11px;font-weight:800;color:#1e293b;">Table ${state?.tableNumber}</div>
         </div>
@@ -214,7 +209,7 @@ export default function Checkout() {
         }
     };
 
-    const submitInvoice = async (isPaid: boolean = false, paidAmount: number = 0) => {
+    const submitInvoice = async (isPaid: boolean = false, paidAmount: number = 0, method: string | null = null) => {
         setIsProcessing(true);
         const user = getCurrentUser();
 
@@ -229,6 +224,7 @@ export default function Checkout() {
                 tax_amount: taxAmount,
                 discount: discountAmount,
                 paid_amount: paidAmount,
+                payment_method: method,
                 items: state.cart.map(c => ({
                     item_type: "PRODUCT",
                     product: parseInt(c.item.id),
@@ -273,7 +269,7 @@ export default function Checkout() {
                 await submitInvoice(false, 0);
                 toast.success("Order Confirmed!", {
                     description: `Table ${state?.tableNumber} - Payment Pending`,
-                    icon: <Clock className="h-5 w-5 text-warning" />,
+                    icon: <CheckCircle2 className="h-5 w-5 text-warning" />,
                 });
                 setShowSuccess(true);
             } catch (err) { }
@@ -304,7 +300,7 @@ export default function Checkout() {
         }
 
         try {
-            await submitInvoice(true, total);
+            await submitInvoice(true, total, "CASH");
             const change = receivedAmount - total;
 
             toast.success("Payment Confirmed!", {
@@ -323,7 +319,7 @@ export default function Checkout() {
 
     const handleQRPayment = async () => {
         try {
-            await submitInvoice(true, total);
+            await submitInvoice(true, total, "QR");
             toast.success("Payment Confirmed!", {
                 description: `Table ${state?.tableNumber} - Rs.${total.toFixed(2)} paid via QR Code`,
                 icon: <CheckCircle2 className="h-5 w-5 text-success" />,
@@ -495,10 +491,6 @@ export default function Checkout() {
                                         <div>
                                             <p className="text-slate-400 font-black uppercase text-[7px] tracking-widest">Order Receipt</p>
                                             <p className="font-black text-slate-800">#{orderId ? String(orderId).slice(-6).toUpperCase() : "NEW-ORDER"}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-slate-400 font-black uppercase text-[7px] tracking-widest">Date & Time</p>
-                                            <p className="font-bold text-slate-800">{new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                                         </div>
                                         <div>
                                             <p className="text-slate-400 font-black uppercase text-[7px] tracking-widest">Serving Location</p>
@@ -843,7 +835,7 @@ export default function Checkout() {
                                     : "border-border hover:border-warning/50"
                             )}
                         >
-                            <Clock className={cn(
+                            <CheckCircle2 className={cn(
                                 "h-8 w-8",
                                 paymentTiming === "later" ? "text-warning" : "text-muted-foreground"
                             )} />

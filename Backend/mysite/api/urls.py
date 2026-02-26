@@ -38,4 +38,10 @@ urlpatterns = [
         views.ItemActivityView.as_view(),
         name="activity_detail",
     ),
+    path("change-password/", views.change_own_password, name="change-password"),
+    path(
+        "admin-reset-password/<int:user_id>/",
+        views.admin_reset_password,
+        name="admin-reset-password",
+    ),
 ]

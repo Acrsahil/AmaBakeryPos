@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WaiterBottomNav } from "@/components/waiter/WaiterBottomNav";
-import { CreditCard, Banknote, CheckCircle2, IndianRupee, Printer, Clock, X, Loader2, Wallet } from "lucide-react";
+import { CreditCard, Banknote, CheckCircle2, IndianRupee, Printer, Clock, X, Loader2, Wallet, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -52,13 +52,13 @@ export default function PaymentCollection() {
     setShowPaymentDialog(true);
   };
 
-  const handlePaymentMethod = (method: 'CASH' | 'CARD' | 'ONLINE') => {
+  const handlePaymentMethod = (method: 'CASH' | 'CARD' | 'ONLINE' | 'QR') => {
     if (method === 'CASH') {
       setShowPaymentDialog(false);
       setShowCashDialog(true);
     } else if (method === 'ONLINE') {
       setShowPaymentDialog(false);
-      setShowOnlineDialog(true);
+      processPayment('QR', parseFloat(selectedOrder.due_amount || selectedOrder.total_amount));
     } else {
       processPayment(method, parseFloat(selectedOrder.due_amount || selectedOrder.total_amount));
     }
@@ -241,12 +241,12 @@ export default function PaymentCollection() {
               <Button
                 variant="outline"
                 className="h-24 flex-col gap-2 rounded-2xl border-2 hover:border-info hover:bg-info/5 hover:text-info transition-all group"
-                onClick={() => handlePaymentMethod('ONLINE')}
+                onClick={() => handlePaymentMethod('QR')}
               >
                 <div className="h-10 w-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-info/20">
-                  <CreditCard className="h-6 w-6 text-slate-400 group-hover:text-info" />
+                  <QrCode className="h-6 w-6 text-slate-400 group-hover:text-info" />
                 </div>
-                <span className="font-bold">Online</span>
+                <span className="font-bold">QR</span>
               </Button>
             </div>
           </div>

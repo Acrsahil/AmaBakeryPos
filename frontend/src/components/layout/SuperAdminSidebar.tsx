@@ -10,6 +10,8 @@ import {
     Monitor
 } from "lucide-react";
 import { logout } from "../../auth/auth";
+import { useState } from "react";
+
 
 
 const navItems = [
@@ -28,6 +30,7 @@ interface SuperAdminSidebarProps {
 export function SuperAdminSidebar({ className, onNavigate }: SuperAdminSidebarProps) {
     const location = useLocation();
     const navigate = useNavigate();
+
 
     return (
         <div className={cn("flex h-full flex-col gradient-espresso text-sidebar-foreground", className)}>
@@ -67,6 +70,19 @@ export function SuperAdminSidebar({ className, onNavigate }: SuperAdminSidebarPr
                     );
                 })}
             </nav>
+
+            {/* Security Info */}
+            <div className="p-4 border-t border-sidebar-border space-y-2">
+                <button
+                    onClick={() => {
+                        if (confirm("Are you sure you want to log out?")) logout();
+                    }}
+                    className="w-full flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 transition-all text-left"
+                >
+                    <LogOut className="h-5 w-5" />
+                    Sign Out
+                </button>
+            </div>
         </div>
     );
 }

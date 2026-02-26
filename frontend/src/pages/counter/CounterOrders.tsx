@@ -17,7 +17,8 @@ import {
     ShoppingBag,
     FileText,
     Check,
-    User
+    User,
+    LogOut
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { getCurrentUser } from "@/auth/auth";
+import { getCurrentUser, logout } from "@/auth/auth";
+import { ChangePasswordModal } from "@/components/auth/ChangePasswordModal";
 import { X } from "lucide-react";
 
 export default function CounterOrders() {
@@ -50,6 +52,7 @@ export default function CounterOrders() {
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [showReceipt, setShowReceipt] = useState(false);
     const [autoPrint, setAutoPrint] = useState(false);
+    const [showChangePassword, setShowChangePassword] = useState(false);
     const [currentUser, setCurrentUser] = useState<any>(null);
 
     useEffect(() => {
@@ -141,7 +144,7 @@ export default function CounterOrders() {
     const handlePaymentSubmit = async () => {
         if (!selectedOrder) return;
         // Allow 0 amount if we are just confirming waiter handover
-        const isConfirmingHandover = selectedOrder.payment_status === 'PAID' && selectedOrder.received_by_waiter && !selectedOrder.received_by_counter;
+        const isConfirmingHandover = (selectedOrder.payment_status === 'PAID' || selectedOrder.payment_status === 'PARTIAL') && selectedOrder.received_by_waiter && !selectedOrder.received_by_counter && parseFloat(selectedOrder.due_amount || 0) <= 0;
 
         if (!isConfirmingHandover && (!paymentAmount || parseFloat(paymentAmount) <= 0)) {
             toast.error("Please enter a valid amount");
@@ -202,6 +205,14 @@ export default function CounterOrders() {
 
                 <div className="flex items-center gap-4">
                     <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowChangePassword(true)}
+                        className="text-slate-500 hover:text-primary font-bold transition-all px-3 hidden sm:flex"
+                    >
+                        Change Password
+                    </Button>
+                    <Button
                         variant="default"
                         onClick={() => navigate('/counter/pos')}
                         className="h-11 px-6 rounded-xl font-black bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 gap-2"
@@ -209,12 +220,25 @@ export default function CounterOrders() {
                         <ShoppingBag className="h-5 w-5" />
                         Sell Items
                     </Button>
-                    <div className="hidden md:flex items-center bg-slate-100 px-4 py-2 rounded-xl gap-2 text-slate-500 font-bold text-xs uppercase tracking-widest">
-                        <Calendar className="h-4 w-4" />
-                        {format(new Date(), 'dd MMM yyyy')}
-                    </div>
+
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                            if (confirm("Are you sure you want to log out?")) logout();
+                        }}
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                        title="Logout"
+                    >
+                        <LogOut className="h-5 w-5" />
+                    </Button>
                 </div>
             </header>
+
+            <ChangePasswordModal
+                isOpen={showChangePassword}
+                onClose={() => setShowChangePassword(false)}
+            />
 
             {/* Toolbar */}
             <div className="px-6 py-4 shrink-0 flex flex-col md:flex-row gap-4">
@@ -265,7 +289,7 @@ export default function CounterOrders() {
                                     <tr>
                                         <td colSpan={9} className="px-6 py-20 text-center">
                                             <div className="flex flex-col items-center gap-4 opacity-30">
-                                                <Clock className="h-16 w-16" />
+                                                <ShoppingBag className="h-16 w-16" />
                                                 <p className="text-xl font-bold">No orders found</p>
                                             </div>
                                         </td>
@@ -316,6 +340,10 @@ export default function CounterOrders() {
                                                                 {m}
                                                             </span>
                                                         ))
+                                                    ) : order.payment_status === 'PAID' || order.payment_status === 'PARTIAL' ? (
+                                                        <span className="text-[11px] font-black px-2 py-0.5 rounded bg-amber-50 text-amber-600 uppercase tracking-tight">
+                                                            {order.payment_status}
+                                                        </span>
                                                     ) : (
                                                         <span className="text-[11px] font-bold text-slate-300 italic">UNPAID</span>
                                                     )}
@@ -457,7 +485,7 @@ export default function CounterOrders() {
                                         </div>
                                     )}
 
-                                    {(selectedOrder?.payment_status !== 'PAID') ? (
+                                    {(selectedOrder?.payment_status !== 'PAID' && parseFloat(selectedOrder?.due_amount || "0") > 0) ? (
                                         <div className="space-y-6 animate-in fade-in slide-in-from-top-4">
                                             <div className="space-y-2">
                                                 <Label className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Amount to Pay</Label>
@@ -524,14 +552,29 @@ export default function CounterOrders() {
 
                                                 {selectedOrder?.received_by_waiter && !selectedOrder?.received_by_counter && (
                                                     <div className="mt-6 pt-6 border-t border-emerald-100 space-y-4">
-                                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700/50">Cash Handover Required</p>
-                                                        <p className="text-xs text-emerald-700 font-bold italic">Wait! The waiter ({selectedOrder.received_by_waiter_name}) still has this cash. Click below once you receive it at the counter.</p>
+                                                        {selectedOrder.payment_methods?.includes('QR') ? (
+                                                            <>
+                                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700/50">Online Payment Received</p>
+                                                                <p className="text-xs text-emerald-700 font-bold italic">This order was paid via QR. Click below to verify and finalize receipt at the counter.</p>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700/50">Cash Handover Required</p>
+                                                                <p className="text-xs text-emerald-700 font-bold italic">Wait! The waiter ({selectedOrder.received_by_waiter_name}) still has this cash. Click below once you receive it at the counter.</p>
+                                                            </>
+                                                        )}
                                                         <Button
                                                             className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 font-bold rounded-xl shadow-lg"
-                                                            onClick={() => { setPaymentAmount("0"); handlePaymentSubmit(); }}
+                                                            onClick={() => {
+                                                                const method = selectedOrder.payment_methods?.includes('QR') ? 'QR' : 'CASH';
+                                                                setPaymentMethod(method as any);
+                                                                setPaymentAmount("0");
+                                                                // Small timeout to ensure state is updated
+                                                                setTimeout(() => handlePaymentSubmit(), 50);
+                                                            }}
                                                             disabled={isPaying}
                                                         >
-                                                            {isPaying ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Handover to Counter"}
+                                                            {isPaying ? <Loader2 className="h-4 w-4 animate-spin" /> : (selectedOrder.payment_methods?.includes('QR') ? "Finalize Receipt" : "Confirm Handover to Counter")}
                                                         </Button>
                                                     </div>
                                                 )}

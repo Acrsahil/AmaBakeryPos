@@ -133,10 +133,6 @@ export default function AdminDashboard() {
           </div>
           <p className="text-sm md:text-base text-muted-foreground">Welcome back, {user?.name || "Admin"}! Here's what's happening at your branch today.</p>
         </div>
-        <div className="flex items-center justify-between sm:block sm:text-right w-full sm:w-auto">
-          <p className="text-sm text-muted-foreground">Today</p>
-          <p className="font-semibold">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-        </div>
       </div>
 
       {/* Stats Grid */}
@@ -162,7 +158,7 @@ export default function AdminDashboard() {
             <StatCard
               title="Total Orders"
               value={dashboardData?.total_count_order || 0}
-              icon={Clock}
+              icon={ShoppingBag}
               subtitle={`Avg: Rs.${dashboardData?.average_order_value?.toFixed(0) || 0}`}
             />
           </>
@@ -187,10 +183,10 @@ export default function AdminDashboard() {
               icon={TrendingUp}
             />
             <StatCard
-              title="Peak Hours"
-              value={dashboardData?.peak_hours?.[0] || "N/A"}
-              icon={Clock}
-              subtitle="Most orders"
+              title="Active Tables"
+              value={tableCount || 0}
+              icon={UtensilsCrossed}
+              subtitle="Current capacity"
             />
           </>
         )}

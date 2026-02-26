@@ -4,8 +4,7 @@ import { MobileHeader } from "@/components/layout/MobileHeader";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { WaiterBottomNav } from "@/components/waiter/WaiterBottomNav";
-import { Clock, ChefHat, Bell, Loader2, User, Users } from "lucide-react";
-import { formatDistanceToNow, parseISO } from "date-fns";
+import { ChefHat, Bell, Loader2, User, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { fetchInvoices } from "@/api/index.js";
@@ -195,19 +194,10 @@ export default function OrderStatus() {
 }
 
 function OrderCard({ order, showWaiter = false }: { order: any; showWaiter?: boolean }) {
-  const isReady = order.payment_status === "PARTIAL" || order.invoice_status === "READY";
+  const isReady = order.invoice_status === "READY";
   const isPaid = order.payment_status === "PAID" || order.invoice_status === "COMPLETED";
 
-  // Fix timestamp — backend returns created_at, not order_date
-  const timeAgo = (() => {
-    const raw = order?.created_at;
-    if (!raw) return "—";
-    try {
-      return formatDistanceToNow(parseISO(raw), { addSuffix: true });
-    } catch {
-      return raw;
-    }
-  })();
+
 
   return (
     <div
@@ -268,8 +258,7 @@ function OrderCard({ order, showWaiter = false }: { order: any; showWaiter?: boo
         {/* Footer row */}
         <div className="flex items-center justify-between pt-2 border-t border-dashed border-slate-100">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Clock className="h-3.5 w-3.5 shrink-0" />
-            <span>{timeAgo}</span>
+            <span className="font-bold text-slate-500 uppercase tracking-widest text-[10px]">Active Order</span>
             {showWaiter && order?.created_by_name && (
               <>
                 <span className="text-slate-300">•</span>

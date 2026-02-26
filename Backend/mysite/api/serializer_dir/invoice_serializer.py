@@ -37,6 +37,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         default=Decimal("0.00"),
         min_value=0,
     )
+    payment_method = serializers.CharField(write_only=True, required=False, default="CASH")
 
     class Meta:
         model = Invoice
@@ -48,6 +49,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "discount",
             "description",
             "paid_amount",
+            "payment_method",
             "items",
             "invoice_status",
             "floor",
@@ -58,6 +60,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop("items")
         paid_amount = validated_data.pop("paid_amount", Decimal("0.00"))
+        payment_method = validated_data.pop("payment_method", "CASH")
         request = self.context.get("request")
         notes = validated_data.get("notes", "")
 
@@ -76,8 +79,16 @@ class InvoiceSerializer(serializers.ModelSerializer):
         # Log who received the initial payment
         role = getattr(user, "user_type", None)
         if paid_amount > 0 and user:
+            from ..models import Payment
+            Payment.objects.create(
+                invoice=invoice,
+                amount=paid_amount,
+                payment_method=payment_method,
+                received_by=user,
+                notes="Initial payment during invoice creation"
+            )
             if role == "WAITER":
-                invoice.payment_status = ("PENDING",)
+                invoice.payment_status = "PARTIAL"
                 invoice.received_by_waiter = user
             elif role in ["COUNTER", "BRANCH_MANAGER", "ADMIN", "SUPER_ADMIN"]:
                 invoice.received_by_counter = user
@@ -102,13 +113,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
         if last_invoice_date != today_date:
             day_list = today_date.split("-")
-            day_list.append("1")
+            day_list.append(f"{1:02d}")
             final_invoice_no = "-".join(day_list)
-            final_invoice_no = f"{branch_id}-" + final_invoice_no
+            final_invoice_no = f"{branch_id:02d}-" + final_invoice_no
         else:
             last_invoice_list = latest_invoice_number.split("-")
-            last_invoice_list[-1] = str(int(last_invoice_list[-1]) + 1)
-            last_invoice_list[0] = str(branch_id)
+            last_invoice_list[-1] = f"{int(last_invoice_list[-1]) + 1:02d}"
+            last_invoice_list[0] = f"{branch_id:02d}"
             final_invoice_no = "-".join(last_invoice_list)
 
         invoice.invoice_number = final_invoice_no

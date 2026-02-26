@@ -32,6 +32,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { logout, getCurrentUser } from "../../auth/auth";
+import { ChangePasswordModal } from "@/components/auth/ChangePasswordModal";
 import { CustomerSelector } from "@/components/pos/CustomerSelector";
 import { fetchProducts, fetchCategories, createInvoice, fetchInvoices } from "@/api/index.js";
 import { MenuItem, User as UserType } from "@/lib/mockData";
@@ -58,6 +59,7 @@ export default function CounterPOS() {
     const [categories, setCategories] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState("");
+    const [showChangePassword, setShowChangePassword] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [cart, setCart] = useState<CartItemData[]>([]);
     const [taxEnabled, setTaxEnabled] = useState(false);
@@ -65,7 +67,7 @@ export default function CounterPOS() {
 
     // Billing States
     const [customer, setCustomer] = useState<any>(null);
-    const [paymentMethod, setPaymentMethod] = useState<"cash" | "qr" | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<"cash" | "qr" | "online" | null>(null);
     const [cashReceived, setCashReceived] = useState("");
     const [paidAmount, setPaidAmount] = useState(0);
     const [dueAmount, setDueAmount] = useState(0);
@@ -304,6 +306,7 @@ export default function CounterPOS() {
                 tax_amount: taxAmount,
                 discount: 0,
                 paid_amount: total,
+                payment_method: paymentMethod === 'cash' ? "CASH" : "QR",
                 items: cart.map(c => ({
                     item_type: "PRODUCT",
                     product: parseInt(c.item.id),
@@ -368,11 +371,37 @@ export default function CounterPOS() {
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{operator?.role}</p>
                     </div>
                     <Separator orientation="vertical" className="h-8" />
-                    <Button variant="ghost" size="icon" onClick={() => navigate('/counter/orders')} className="rounded-xl hover:bg-slate-100">
-                        <Clock className="h-5 w-5 text-slate-500" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowChangePassword(true)}
+                            className="text-slate-500 hover:text-primary font-bold transition-all px-3 hidden sm:flex"
+                        >
+                            Change Password
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => navigate('/counter/orders')} className="rounded-xl hover:bg-slate-100" title="Order History">
+                            <Receipt className="h-5 w-5 text-slate-500" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                                if (confirm("Are you sure you want to log out?")) logout();
+                            }}
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                            title="Logout"
+                        >
+                            <LogOut className="h-5 w-5" />
+                        </Button>
+                    </div>
                 </div>
             </header>
+
+            <ChangePasswordModal
+                isOpen={showChangePassword}
+                onClose={() => setShowChangePassword(false)}
+            />
 
             {/* Main Content Area */}
             <main className="flex-1 flex overflow-hidden">
