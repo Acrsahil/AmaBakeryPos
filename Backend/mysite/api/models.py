@@ -70,7 +70,7 @@ class Product(models.Model):
         Branch,  # Replace with your actual Branch model name
         on_delete=models.PROTECT,
         related_name="products",
-        null=True,  
+        null=True,
     )
     low_stock_bar = models.IntegerField(default=0)
     created_at = models.DateTimeField(default=timezone.now)
@@ -87,7 +87,7 @@ class Product(models.Model):
         return f"{self.name} - {self.category.branch.name}"
 
     class Meta:
-        unique_together = ["name",  "branch"]  # Now this works!
+        unique_together = ["name", "branch"]  # Now this works!
 
 
 class Customer(models.Model):
