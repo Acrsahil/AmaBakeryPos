@@ -1,9 +1,10 @@
 import { StatCard } from "@/components/admin/StatCard";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { NavLink } from "react-router-dom";
 import { fetchDashboardDetails, fetchInvoices, fetchTables } from "@/api/index.js";
 import { getCurrentUser } from "../../auth/auth";
 import { toast } from "sonner";
+import { useDashboardSSE } from "@/hooks/useDashboardSSE";
 import {
   DollarSign,
   ShoppingBag,
@@ -14,7 +15,9 @@ import {
   MapPin,
   Loader2,
   ExternalLink,
-  Layers
+  Layers,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 import {
   BarChart,
@@ -45,6 +48,22 @@ export default function AdminDashboard() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [floors, setFloors] = useState<any[]>([]);
+  const [sseConnected, setSSEConnected] = useState(false);
+
+  // SSE: Real-time dashboard updates
+  const handleSSEUpdate = useCallback((data: any) => {
+    if (data.success) {
+      setDashboardData((prev: any) => ({
+        ...prev,
+        ...data,
+      }));
+      setSSEConnected(true);
+      // Also refresh recent orders when we get an update
+      loadRecentOrders();
+    }
+  }, []);
+
+  useDashboardSSE(user?.branch_id, handleSSEUpdate);
 
   useEffect(() => {
     loadDashboardData();
@@ -157,6 +176,23 @@ export default function AdminDashboard() {
             <div className="bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1 border border-primary/20">
               <MapPin className="h-3 w-3" />
               {branchLabel}
+            </div>
+            <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1 border ${
+              sseConnected 
+                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" 
+                : "bg-slate-100 text-slate-400 border-slate-200"
+            }`}>
+              {sseConnected ? (
+                <>
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-3 w-3" />
+                  Offline
+                </>
+              )}
             </div>
           </div>
           <p className="text-sm md:text-base text-muted-foreground">Welcome back, {user?.name || "Admin"}! Here's what's happening at your branch today.</p>

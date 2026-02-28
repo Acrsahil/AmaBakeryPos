@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Store,
@@ -13,8 +13,10 @@ import {
     ExternalLink,
     Globe,
     Loader2,
-    BarChart3
+    BarChart3,
+    WifiOff
 } from "lucide-react";
+import { useDashboardSSE } from "@/hooks/useDashboardSSE";
 import {
     BarChart,
     Bar,
@@ -64,6 +66,7 @@ export default function SuperAdminOverview() {
     const [searchTerm, setSearchTerm] = useState("");
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [sseConnected, setSSEConnected] = useState(false);
 
     // Enhanced Form State
     const [form, setForm] = useState({
@@ -75,6 +78,19 @@ export default function SuperAdminOverview() {
         manager_email: "",
         manager_phone: "",
     });
+
+    // SSE: Real-time dashboard updates (null = global view for superadmin)
+    const handleSSEUpdate = useCallback((data: any) => {
+        if (data.success) {
+            setDashboardData((prev: any) => ({
+                ...prev,
+                ...data,
+            }));
+            setSSEConnected(true);
+        }
+    }, []);
+
+    useDashboardSSE(null, handleSSEUpdate);
 
     useEffect(() => {
         loadData();
@@ -181,7 +197,26 @@ export default function SuperAdminOverview() {
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-black tracking-tight">Enterprise Overview</h1>
+                    <div className="flex items-center gap-3 mb-1">
+                        <h1 className="text-2xl md:text-3xl font-black tracking-tight">Enterprise Overview</h1>
+                        <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1.5 border ${
+                            sseConnected 
+                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" 
+                                : "bg-slate-100 text-slate-400 border-slate-200"
+                        }`}>
+                            {sseConnected ? (
+                                <>
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    Live
+                                </>
+                            ) : (
+                                <>
+                                    <WifiOff className="h-3 w-3" />
+                                    Connecting...
+                                </>
+                            )}
+                        </div>
+                    </div>
                     <p className="text-sm md:text-base text-muted-foreground font-medium">
                         {loading ? "Syncing data..." : `Monitoring ${branches.length} branches across the network.`}
                     </p>
