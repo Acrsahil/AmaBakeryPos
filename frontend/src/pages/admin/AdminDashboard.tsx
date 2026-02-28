@@ -13,7 +13,8 @@ import {
   Coffee,
   MapPin,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  Layers
 } from "lucide-react";
 import {
   BarChart,
@@ -43,7 +44,7 @@ export default function AdminDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tableCount, setTableCount] = useState<number>(0);
+  const [floors, setFloors] = useState<any[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -70,10 +71,12 @@ export default function AdminDashboard() {
   const loadTableData = async () => {
     try {
       const tablesData = await fetchTables();
-      const myBranchConfig = tablesData.find((t: any) => t.branch === user?.branch_id);
-      if (myBranchConfig) {
-        setTableCount(myBranchConfig.table_count || 0);
-      }
+      const branchId = user?.branch_id;
+      const branchFloors =
+        branchId != null
+          ? (tablesData || []).filter((f: any) => f.branch === branchId)
+          : tablesData || [];
+      setFloors(branchFloors);
     } catch (error) {
       console.error("Failed to fetch tables:", error);
     }
@@ -110,12 +113,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const generatedTables = Array.from({ length: tableCount }, (_, i) => ({
-    id: i + 1,
-    number: i + 1,
-    status: 'available'
-  }));
-
   // Determine if we're showing global summary (admin/superadmin with no branch)
   const isSuperOrAdmin = user?.is_superuser || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
   const isGlobalView = isSuperOrAdmin && !user?.branch_id;
@@ -133,6 +130,22 @@ export default function AdminDashboard() {
   ];
 
   const hourlyChartData = dashboardData?.Hourly_sales || [];
+
+  // Peak hour: use API peak_hours when present, else derive from Hourly_sales (hour with max sales)
+  const peakHourDisplay = (() => {
+    const peakHours = dashboardData?.peak_hours;
+    if (Array.isArray(peakHours) && peakHours.length > 0) {
+      return peakHours.join(", ");
+    }
+    const hourly = dashboardData?.Hourly_sales || [];
+    if (hourly.length > 0) {
+      const maxEntry = hourly.reduce((best: any, cur: any) =>
+        (cur?.sales ?? 0) > (best?.sales ?? 0) ? cur : best
+      );
+      return maxEntry?.hour ?? "—";
+    }
+    return "—";
+  })();
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -198,10 +211,10 @@ export default function AdminDashboard() {
               icon={TrendingUp}
             />
             <StatCard
-              title="Active Tables"
-              value={tableCount || 0}
-              icon={UtensilsCrossed}
-              subtitle="Current capacity"
+              title="Peak Hour"
+              value={peakHourDisplay}
+              icon={Clock}
+              subtitle="Busiest today"
             />
           </>
         )}
@@ -312,10 +325,10 @@ export default function AdminDashboard() {
 
       {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Live Table Status */}
+        {/* Floors in current branch */}
         <div className="card-elevated p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Live Table Status</h3>
+            <h3 className="text-lg font-semibold">Floors</h3>
             <div className="flex items-center gap-2">
               <NavLink
                 to="/admin/dashboard/tables"
@@ -324,20 +337,27 @@ export default function AdminDashboard() {
               >
                 <ExternalLink className="h-4 w-4" />
               </NavLink>
-              <UtensilsCrossed className="h-5 w-5 text-primary" />
+              <Layers className="h-5 w-5 text-primary" />
             </div>
           </div>
-
-          <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
-            {generatedTables.map((table) => (
-              <div
-                key={table.id}
-                className="aspect-square rounded-md flex items-center justify-center text-[10px] sm:text-xs font-black bg-success/10 text-success border border-success/20 shadow-sm hover:border-success/40 transition-colors"
-              >
-                {table.number}
-              </div>
-            ))}
-          </div>
+          <p className="text-xs text-muted-foreground mb-4">Floors in this branch</p>
+          {floors.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No floors configured. Add floors in Table Management.</p>
+          ) : (
+            <div className="space-y-2">
+              {floors.map((floor: any) => (
+                <div
+                  key={floor.id}
+                  className="flex items-center justify-between py-3 px-4 rounded-xl bg-muted/50 border border-border hover:bg-muted/70 transition-colors"
+                >
+                  <span className="font-medium text-foreground">{floor.name || `Floor #${floor.id}`}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {floor.table_count ?? 0} table{(floor.table_count ?? 0) !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Top Selling Items */}

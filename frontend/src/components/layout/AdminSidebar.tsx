@@ -19,7 +19,7 @@ import { useState } from "react";
 
 
 
-const navItems = [
+const allNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
   { icon: Monitor, label: "POS Terminal", path: "/counter/pos" },
   { icon: ClipboardList, label: "Orders", path: "/admin/dashboard/orders" },
@@ -43,6 +43,13 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
   // Get current user and branch
   const user = getCurrentUser();
   const branchName = user?.branch_name || "Admin Panel";
+
+  // Hide Global Analytics for branch manager and admin (show only for super admin at HQ)
+  const navItems = allNavItems.filter(
+    (item) =>
+      item.path !== "/admin/dashboard/global-analytics" ||
+      (user?.is_superuser && !user?.is_branch_scoped)
+  );
 
   return (
     <div className={cn("flex h-full flex-col gradient-espresso text-sidebar-foreground", className)}>
