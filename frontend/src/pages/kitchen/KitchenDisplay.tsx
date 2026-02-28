@@ -54,6 +54,18 @@ export default function KitchenDisplay() {
     loadData();
   }, []);
 
+  // Play notification sound
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio("/noti.mp3");
+      audio.play().catch(() => {
+        // Autoplay may be blocked by browser until user interaction
+      });
+    } catch {
+      // Ignore audio errors
+    }
+  };
+
   // WebSocket: listen for new invoices and refresh kitchen data
   useEffect(() => {
     // Derive websocket base from API base URL env
@@ -70,7 +82,11 @@ export default function KitchenDisplay() {
       try {
         const data = JSON.parse(event.data);
         if (data.type === "invoice_created") {
-          // When a new invoice is created anywhere, refresh kitchen orders
+          // New order placed - play sound and refresh
+          playNotificationSound();
+          loadData();
+        } else if (data.type === "invoice_updated") {
+          // Order updated - just refresh (no sound for updates in kitchen)
           loadData();
         }
       } catch {

@@ -1,5 +1,7 @@
 from datetime import date
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
@@ -159,7 +161,7 @@ class InvoiceViewClass(APIView):
         # Don't allow modifying paid/cancelled invoices
 
         print("i", invoice.payment_status)
-        if invoice.payment_status in ["PAID", "CANCELLED"]:
+        if invoice.payment_status in ["CANCELLED"]:
             print("i am inside patch method!")
             return Response(
                 {
@@ -179,6 +181,27 @@ class InvoiceViewClass(APIView):
         serializer = InvoiceResponseSerializer(invoice, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
+
+            # Broadcast status update to all connected clients (kitchen, waiter, counter)
+            new_status = data.get("invoice_status")
+            if new_status:
+                try:
+                    channel_layer = get_channel_layer()
+                    if channel_layer is not None:
+                        message = {
+                            "type": "invoice_updated",
+                            "invoice_id": str(id),
+                            "status": new_status,
+                        }
+                        # Notify kitchen screens
+                        async_to_sync(channel_layer.group_send)(
+                            "kitchen_orders", message
+                        )
+                        # Notify waiter/counter screens
+                        async_to_sync(channel_layer.group_send)("orders", message)
+                except Exception:
+                    pass
+
             return Response({"success": True, "data": serializer.data})
 
         return Response(

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { fetchInvoices } from "@/api/index.js";
 import { getCurrentUser } from "@/auth/auth";
+import { useOrdersWebSocket } from "@/hooks/useOrdersWebSocket";
 
 type Tab = "mine" | "all";
 
@@ -19,11 +20,7 @@ export default function OrderStatus() {
   const [activeTab, setActiveTab] = useState<Tab>("mine");
   const currentUser = getCurrentUser();
 
-  useEffect(() => {
-    loadInvoices();
-  }, []);
-
-  const loadInvoices = async () => {
+  const loadInvoices = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchInvoices();
@@ -33,7 +30,39 @@ export default function OrderStatus() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadInvoices();
+  }, [loadInvoices]);
+
+  // Play notification sound
+  const playNotificationSound = useCallback(() => {
+    try {
+      const audio = new Audio("/noti.mp3");
+      audio.play().catch(() => {
+        // Autoplay may be blocked by browser until user interaction
+      });
+    } catch {
+      // Ignore audio errors
+    }
+  }, []);
+
+  // WebSocket: auto-refresh when invoice created or status updated (e.g. kitchen marks ready)
+  useOrdersWebSocket(
+    useCallback(
+      (data) => {
+        if (data.type === "invoice_updated" && data.status === "READY") {
+          // Order is ready - play notification sound
+          playNotificationSound();
+          loadInvoices();
+        } else if (data.type === "invoice_created" || data.type === "invoice_updated") {
+          loadInvoices();
+        }
+      },
+      [loadInvoices, playNotificationSound]
+    )
+  );
 
   // "Your Orders" — only this waiter's orders
   const myOrders = allOrders.filter(

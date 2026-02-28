@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { fetchInvoices, addPayment } from "@/api/index.js";
+import { useOrdersWebSocket } from "@/hooks/useOrdersWebSocket";
 
 export default function PaymentCollection() {
   const navigate = useNavigate();
@@ -27,11 +28,7 @@ export default function PaymentCollection() {
   const [completedOrder, setCompletedOrder] = useState<any | null>(null);
   const [completedChange, setCompletedChange] = useState<number>(0);
 
-  useEffect(() => {
-    loadInvoices();
-  }, []);
-
-  const loadInvoices = async () => {
+  const loadInvoices = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchInvoices();
@@ -45,7 +42,39 @@ export default function PaymentCollection() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadInvoices();
+  }, [loadInvoices]);
+
+  // Play notification sound
+  const playNotificationSound = useCallback(() => {
+    try {
+      const audio = new Audio("/noti.mp3");
+      audio.play().catch(() => {
+        // Autoplay may be blocked by browser until user interaction
+      });
+    } catch {
+      // Ignore audio errors
+    }
+  }, []);
+
+  // WebSocket: auto-refresh when invoice created or status updated
+  useOrdersWebSocket(
+    useCallback(
+      (data) => {
+        if (data.type === "invoice_updated" && data.status === "READY") {
+          // Order ready - play notification sound
+          playNotificationSound();
+          loadInvoices();
+        } else if (data.type === "invoice_created" || data.type === "invoice_updated") {
+          loadInvoices();
+        }
+      },
+      [loadInvoices, playNotificationSound]
+    )
+  );
 
   const handlePaymentClick = (order: any) => {
     setSelectedOrder(order);

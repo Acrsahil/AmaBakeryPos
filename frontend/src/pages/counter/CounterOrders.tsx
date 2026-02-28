@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     ChevronLeft,
@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { getCurrentUser, logout } from "@/auth/auth";
 import { ChangePasswordModal } from "@/components/auth/ChangePasswordModal";
 import { X } from "lucide-react";
+import { useOrdersWebSocket } from "@/hooks/useOrdersWebSocket";
 
 export default function CounterOrders() {
     const navigate = useNavigate();
@@ -69,12 +70,7 @@ export default function CounterOrders() {
         setCurrentUser(getCurrentUser());
     }, []);
 
-    useEffect(() => {
-        loadInvoices();
-        loadProducts();
-    }, []);
-
-    const loadProducts = async () => {
+    const loadProducts = useCallback(async () => {
         try {
             const data = await fetchProducts();
             if (!Array.isArray(data)) {
@@ -91,9 +87,9 @@ export default function CounterOrders() {
             console.error("Failed to load products for mapping", err);
             setProductsMap({});
         }
-    };
+    }, []);
 
-    const loadInvoices = async () => {
+    const loadInvoices = useCallback(async () => {
         setLoading(true);
         try {
             const data = await fetchInvoices();
@@ -114,7 +110,44 @@ export default function CounterOrders() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        loadInvoices();
+        loadProducts();
+    }, [loadInvoices, loadProducts]);
+
+    // Play notification sound
+    const playNotificationSound = useCallback(() => {
+        try {
+            const audio = new Audio("/noti.mp3");
+            audio.play().catch(() => {
+                // Autoplay may be blocked by browser until user interaction
+            });
+        } catch {
+            // Ignore audio errors
+        }
+    }, []);
+
+    // WebSocket: auto-refresh when invoice created or status updated
+    useOrdersWebSocket(
+        useCallback(
+            (data) => {
+                if (data.type === "invoice_created") {
+                    // New order - play sound
+                    playNotificationSound();
+                    loadInvoices();
+                } else if (data.type === "invoice_updated" && data.status === "READY") {
+                    // Order ready - play sound
+                    playNotificationSound();
+                    loadInvoices();
+                } else if (data.type === "invoice_updated") {
+                    loadInvoices();
+                }
+            },
+            [loadInvoices, playNotificationSound]
+        )
+    );
 
     const handlePayOpen = (order: any) => {
         setSelectedOrder(order);

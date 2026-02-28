@@ -187,19 +187,19 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
         invoice.save()
 
-        # Notify kitchen screens via WebSocket
+        # Notify all screens via WebSocket (kitchen, waiter, counter)
         try:
             channel_layer = get_channel_layer()
             if channel_layer is not None:
-                async_to_sync(channel_layer.group_send)(
-                    "kitchen_orders",
-                    {
-                        "type": "invoice_created",
-                        "invoice_id": str(invoice.id),
-                    },
-                )
+                message = {
+                    "type": "invoice_created",
+                    "invoice_id": str(invoice.id),
+                }
+                # Notify kitchen screens
+                async_to_sync(channel_layer.group_send)("kitchen_orders", message)
+                # Notify waiter/counter screens
+                async_to_sync(channel_layer.group_send)("orders", message)
         except Exception:
-            # Never break invoice creation because of websocket issues
             pass
 
         return invoice
