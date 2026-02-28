@@ -85,7 +85,9 @@ class InvoiceViewClass(APIView):
                 status=status.HTTP_403_FORBIDDEN,  #  Use status constants
             )
 
-        serializer = InvoiceSerializer(data=request.data, context={"request": request,"branch":my_branch.id})
+        serializer = InvoiceSerializer(
+            data=request.data, context={"request": request, "branch": my_branch.id}
+        )
 
         if serializer.is_valid():
             print("yy")

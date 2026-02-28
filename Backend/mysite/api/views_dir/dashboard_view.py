@@ -224,8 +224,11 @@ class DashboardViewClass(APIView):
             max_orders = hourly_orders.aggregate(max_orders=Max("total_orders"))[
                 "max_orders"
             ]
-            peak_hours = hourly_orders.filter(total_orders=max_orders)
-            formatted_peak_hours = [h["hour"].strftime("%I:%M %p") for h in peak_hours]
+            if max_orders is not None:
+                peak_hours = hourly_orders.filter(total_orders=max_orders)
+                formatted_peak_hours = [h["hour"].strftime("%I:%M %p") for h in peak_hours]
+            else:
+                formatted_peak_hours = []
 
             print("Max Orders-> ", max_orders)
 
