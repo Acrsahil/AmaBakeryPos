@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -19,6 +20,11 @@ load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+# settings.py
+
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
 
 
 # Quick-start development settings - unsuitable for production
@@ -54,10 +60,10 @@ SIMPLE_JWT = {
 }
 
 
-
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
     "channels",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -100,20 +106,43 @@ TEMPLATES = [
     },
 ]
 
+# settings.py - CHANNEL_LAYERS section
+
+
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "amabakery@123")
+
+# This configuration should work with your current versions
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("localhost", 6379)],
+            "hosts": [f"redis://:{REDIS_PASSWORD}@127.0.0.1:6379/0"],
         },
     },
-} 
+}
 
-# for normal http 
+
+# Optional: Test Redis connection
+import redis
+
+try:
+    redis_client = redis.Redis(
+        host="127.0.0.1",
+        port=6379,
+        password=REDIS_PASSWORD,
+        db=0,
+        decode_responses=True,
+    )
+    redis_client.ping()
+    print("✅ Redis connection successful!")
+except Exception as e:
+    print(f"❌ Redis connection failed: {e}")
+# for normal http
 WSGI_APPLICATION = "mysite.wsgi.application"
 
 # for websockets
 ASGI_APPLICATION = "mysite.asgi.application"
+
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases

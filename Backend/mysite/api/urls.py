@@ -1,6 +1,7 @@
 from django.urls import include, path
 
 from . import views
+from .views_dir.sse_views import dashboard_sse
 
 urlpatterns = [
     path("calculate/", include("api.calculate_urls")),
@@ -44,4 +45,5 @@ urlpatterns = [
         views.admin_reset_password,
         name="admin-reset-password",
     ),
+    path("api/dashboard/stream/", dashboard_sse, name="dashboard-sse"),
 ]

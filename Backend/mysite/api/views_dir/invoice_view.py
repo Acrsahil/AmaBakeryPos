@@ -91,7 +91,10 @@ class InvoiceViewClass(APIView):
         branch_id = my_branch.id if my_branch else request.data.get("branch")
         if not branch_id:
             return Response(
-                {"success": False, "message": "Branch is required to create an invoice."},
+                {
+                    "success": False,
+                    "message": "Branch is required to create an invoice.",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -102,7 +105,10 @@ class InvoiceViewClass(APIView):
             and role not in ["ADMIN", "SUPER_ADMIN"]
         ):
             return Response(
-                {"success": False, "message": "You can only create invoices in your own branch."},
+                {
+                    "success": False,
+                    "message": "You can only create invoices in your own branch.",
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
