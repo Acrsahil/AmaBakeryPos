@@ -19,14 +19,10 @@ class ProductViewClass(APIView):
         role = self.get_user_role(request.user)
         my_branch = request.user.branch
 
-
-
-
         # Support branch_id query parameter for global admins
         branch_id = request.query_params.get("branch_id") or request.query_params.get(
             "branch"
         )
-        
 
         if id:
             # get single product
@@ -51,7 +47,7 @@ class ProductViewClass(APIView):
 
             if role in ["ADMIN", "SUPER_ADMIN"]:
                 # If a branch filter is provided, use it
-                print("This is branch id->> ",branch_id)
+                print("This is branch id->> ", branch_id)
                 if branch_id:
                     products = products.filter(branch_id=branch_id)
             else:
@@ -277,7 +273,14 @@ class ProductViewClass(APIView):
         cost_price = request.data.get("cost_price", product.cost_price)
         selling_price = request.data.get("selling_price", product.selling_price)
 
-        if selling_price and cost_price and selling_price < cost_price:
+        print(
+            f"Selling Price type-> {type(selling_price)} , amount -> {selling_price}",
+        )
+        print(
+            f"Cost Price type-> {type(cost_price)} , amount -> {cost_price}",
+        )
+
+        if selling_price and cost_price and float(selling_price) < float(cost_price):
             errors["selling_price"] = (
                 "Selling price must be greater than or equal to cost price."
             )

@@ -1,4 +1,3 @@
-from datetime import datetime
 from decimal import Decimal
 
 from asgiref.sync import async_to_sync
@@ -40,7 +39,15 @@ class InvoiceSerializer(serializers.ModelSerializer):
         default=Decimal("0.00"),
         min_value=0,
     )
-    payment_method = serializers.CharField(write_only=True, required=False, default="CASH")
+    payment_method = serializers.CharField(
+        write_only=True,
+        required=False,
+        default="CASH",
+        allow_blank=True,
+        allow_null=True,
+    )
+
+    # REMOVED the problematic print statement from here!
 
     class Meta:
         model = Invoice
@@ -83,12 +90,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
         role = getattr(user, "user_type", None)
         if paid_amount > 0 and user:
             from ..models import Payment
+
             Payment.objects.create(
                 invoice=invoice,
                 amount=paid_amount,
                 payment_method=payment_method,
                 received_by=user,
-                notes="Initial payment during invoice creation"
+                notes="Initial payment during invoice creation",
             )
             if role == "WAITER":
                 invoice.payment_status = "PARTIAL"
@@ -97,7 +105,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 invoice.received_by_counter = user
 
         # Generate invoice number
-
         branch_id = self.context.get("branch")
         try:
             branch_id_int = int(branch_id)
@@ -105,14 +112,18 @@ class InvoiceSerializer(serializers.ModelSerializer):
             branch_id_int = None
 
         if not branch_id_int:
-            raise serializers.ValidationError({"branch": "Invalid branch for invoice creation."})
+            raise serializers.ValidationError(
+                {"branch": "Invalid branch for invoice creation."}
+            )
 
         today_date = timezone.localdate().strftime("%Y-%m-%d")
         prefix = f"{branch_id_int:02d}-{today_date}"
 
         # Find the latest invoice number for this branch for today
         latest_today = (
-            Invoice.objects.filter(branch=branch_id_int, invoice_number__startswith=prefix)
+            Invoice.objects.filter(
+                branch=branch_id_int, invoice_number__startswith=prefix
+            )
             .exclude(id=invoice.id)
             .order_by("-invoice_number")
             .first()
@@ -160,7 +171,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             - (invoice.discount or Decimal("0.00"))
         )
 
-        # Payment status logic
+        # Payment status logic for PAY LATER
         if invoice.paid_amount >= invoice.total_amount and role in [
             "COUNTER",
             "ADMIN",
@@ -171,11 +182,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
         elif invoice.paid_amount > 0:
             invoice.payment_status = "PARTIAL"
         else:
+            # This handles PAY LATER case (paid_amount = 0)
             invoice.payment_status = "PENDING"
 
         invoice.save()
 
-        # Notify kitchen screens via WebSocket (non-blocking best-effort)
+        # Notify kitchen screens via WebSocket
         try:
             channel_layer = get_channel_layer()
             if channel_layer is not None:
@@ -189,6 +201,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         except Exception:
             # Never break invoice creation because of websocket issues
             pass
+
         return invoice
 
     def update(self, instance, validated_data):
@@ -297,4 +310,5 @@ class InvoiceResponseSerializer(serializers.ModelSerializer):
         return obj.total_amount - obj.paid_amount
 
     def get_payment_methods(self, obj):
+        print(list(obj.payments.values_list("payment_method", flat=True).distinct()))
         return list(obj.payments.values_list("payment_method", flat=True).distinct())

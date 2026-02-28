@@ -1,6 +1,10 @@
 const RAW_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const apiBaseUrl = RAW_BASE.replace(/\/+$/, ""); // remove trailing /
 
+// --- POLLING CONFIGURATION ---
+// You can change this value to adjust polling interval
+export const DASHBOARD_POLL_INTERVAL = 3000; // 30 seconds (change this as needed)
+
 // --- TOKEN MANAGEMENT ---
 // In-memory access token (more secure against XSS)
 let _accessToken = null;
@@ -34,8 +38,6 @@ export async function clearTokens() {
   }
 }
 
-
-
 // Get the current access token
 export function getAccessToken() {
   return _accessToken;
@@ -62,7 +64,6 @@ export async function refreshAccessToken() {
   return _accessToken;
 }
 
-
 // Check if we have a session to restore
 export async function initializeAuth() {
   if (_accessToken) return true;
@@ -76,7 +77,6 @@ export async function initializeAuth() {
     return false;
   }
 }
-
 
 // --- SECURE FETCHER ---
 // This wrapper handles:
@@ -120,7 +120,6 @@ async function apiFetch(endpoint, options = {}) {
     }
   }
 
-
   return response;
 }
 
@@ -144,6 +143,106 @@ async function safeJson(res) {
       `Server did not return JSON.\nStatus: ${res.status}\nContent-Type: ${contentType}\nPreview: ${safePreview(text)}`
     );
   }
+}
+
+// --- LONG POLLING FOR DASHBOARD ---
+
+// Store polling state
+let dashboardPollingActive = false;
+let dashboardPollTimeout = null;
+let dashboardPollCallbacks = new Set();
+
+/**
+ * Start long polling for dashboard updates
+ * @param {Function} onUpdate - Callback function to handle dashboard updates
+ * @param {number} interval - Polling interval in milliseconds (default: DASHBOARD_POLL_INTERVAL)
+ * @returns {Function} Stop function
+ */
+export function startDashboardPolling(onUpdate, interval = DASHBOARD_POLL_INTERVAL) {
+  // Add callback to set
+  dashboardPollCallbacks.add(onUpdate);
+  
+  // Start polling if not already active
+  if (!dashboardPollingActive) {
+    console.log(`🔄 Starting dashboard polling every ${interval/1000} seconds...`);
+    dashboardPollingActive = true;
+    pollDashboard(interval);
+  }
+  
+  // Return function to stop polling for this specific callback
+  return () => {
+    dashboardPollCallbacks.delete(onUpdate);
+    if (dashboardPollCallbacks.size === 0) {
+      stopDashboardPolling();
+    }
+  };
+}
+
+/**
+ * Stop all dashboard polling
+ */
+export function stopDashboardPolling() {
+  console.log("🛑 Stopping dashboard polling...");
+  dashboardPollingActive = false;
+  if (dashboardPollTimeout) {
+    clearTimeout(dashboardPollTimeout);
+    dashboardPollTimeout = null;
+  }
+}
+
+/**
+ * Internal polling function
+ */
+async function pollDashboard(interval) {
+  if (!dashboardPollingActive) return;
+  
+  try {
+    console.log('📊 Polling dashboard...', new Date().toLocaleTimeString());
+    
+    // Use your existing apiFetch to get dashboard data
+    const data = await fetchDashboardDetails();
+    
+    // Notify all callbacks
+    dashboardPollCallbacks.forEach(callback => {
+      try {
+        callback(data);
+      } catch (err) {
+        console.error('Error in dashboard polling callback:', err);
+      }
+    });
+    
+    console.log('✅ Dashboard updated', new Date().toLocaleTimeString());
+    
+  } catch (error) {
+    console.error('❌ Dashboard polling failed:', error);
+    
+    // Don't stop polling on error, just log it
+    // The apiFetch will handle token refresh automatically
+    
+  } finally {
+    // Schedule next poll
+    if (dashboardPollingActive) {
+      dashboardPollTimeout = setTimeout(() => {
+        pollDashboard(interval);
+      }, interval);
+    }
+  }
+}
+
+/**
+ * Get current polling status
+ * @returns {boolean} Whether polling is active
+ */
+export function isDashboardPollingActive() {
+  return dashboardPollingActive;
+}
+
+/**
+ * Get number of active polling listeners
+ * @returns {number} Number of active callbacks
+ */
+export function getDashboardPollingListenerCount() {
+  return dashboardPollCallbacks.size;
 }
 
 // --- API METHODS ---
@@ -196,7 +295,6 @@ export async function adminResetPassword(userId, newPassword) {
   }
   return data;
 }
-
 
 export async function fetchMe() {
   const res = await apiFetch("/api/me/");
@@ -487,6 +585,14 @@ export async function fetchDashboardDetails(branchId = null) {
   return data;
 }
 
+/**
+ * Fetch dashboard stats (alias for fetchDashboardDetails)
+ * Use this for polling to keep naming consistent
+ */
+export async function fetchDashboardStats(branchId = null) {
+  return fetchDashboardDetails(branchId);
+}
+
 export async function fetchReportDashboard(branchId = null) {
   const url = branchId
     ? `/api/calculate/report-dashboard/${branchId}/`
@@ -505,4 +611,11 @@ export async function fetchStaffReport(branchId = null) {
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to fetch staff report");
   return data;
+}
+
+/**
+ * Manual refresh dashboard (one-time fetch)
+ */
+export async function refreshDashboard(branchId = null) {
+  return fetchDashboardDetails(branchId);
 }
