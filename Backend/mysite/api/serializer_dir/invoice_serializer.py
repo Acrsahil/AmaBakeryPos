@@ -1,6 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
@@ -172,6 +174,21 @@ class InvoiceSerializer(serializers.ModelSerializer):
             invoice.payment_status = "PENDING"
 
         invoice.save()
+
+        # Notify kitchen screens via WebSocket (non-blocking best-effort)
+        try:
+            channel_layer = get_channel_layer()
+            if channel_layer is not None:
+                async_to_sync(channel_layer.group_send)(
+                    "kitchen_orders",
+                    {
+                        "type": "invoice_created",
+                        "invoice_id": str(invoice.id),
+                    },
+                )
+        except Exception:
+            # Never break invoice creation because of websocket issues
+            pass
         return invoice
 
     def update(self, instance, validated_data):

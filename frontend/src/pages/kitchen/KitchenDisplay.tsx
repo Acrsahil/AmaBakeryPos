@@ -43,6 +43,7 @@ export default function KitchenDisplay() {
   });
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [socketConnected, setSocketConnected] = useState(false);
 
   const handleFloorChange = (id: number | 'all') => {
     setSelectedFloorId(id);
@@ -51,6 +52,43 @@ export default function KitchenDisplay() {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // WebSocket: listen for new invoices and refresh kitchen data
+  useEffect(() => {
+    // Derive websocket base from API base URL env
+    const rawBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+    const httpStripped = rawBase.replace(/\/+$/, "");
+    const wsBase = httpStripped.replace(/^http/, "ws");
+    const socket = new WebSocket(wsBase + "/ws/kitchen/");
+
+    socket.onopen = () => {
+      setSocketConnected(true);
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "invoice_created") {
+          // When a new invoice is created anywhere, refresh kitchen orders
+          loadData();
+        }
+      } catch {
+        // Ignore malformed messages
+      }
+    };
+
+    socket.onclose = () => {
+      setSocketConnected(false);
+    };
+
+    socket.onerror = () => {
+      setSocketConnected(false);
+    };
+
+    return () => {
+      socket.close();
+    };
   }, []);
 
   const loadData = async () => {
