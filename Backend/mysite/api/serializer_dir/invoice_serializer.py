@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from ..models import Invoice, InvoiceItem  # adjust import path if needed
@@ -96,31 +97,34 @@ class InvoiceSerializer(serializers.ModelSerializer):
         # Generate invoice number
 
         branch_id = self.context.get("branch")
-        print(branch_id)
-        latest_invoice = Invoice.objects.filter(branch=branch_id).order_by(
-            "-created_at"
-        )[1]
-        last_invoice_date = str(latest_invoice.created_at).split(" ")[0]
+        try:
+            branch_id_int = int(branch_id)
+        except (TypeError, ValueError):
+            branch_id_int = None
 
-        latest_invoice_number = latest_invoice.invoice_number
+        if not branch_id_int:
+            raise serializers.ValidationError({"branch": "Invalid branch for invoice creation."})
 
-        print("latest_invoice_number -> ", latest_invoice)
+        today_date = timezone.localdate().strftime("%Y-%m-%d")
+        prefix = f"{branch_id_int:02d}-{today_date}"
 
-        today_date = str(datetime.today()).split(" ")[0]
+        # Find the latest invoice number for this branch for today
+        latest_today = (
+            Invoice.objects.filter(branch=branch_id_int, invoice_number__startswith=prefix)
+            .exclude(id=invoice.id)
+            .order_by("-invoice_number")
+            .first()
+        )
 
-        print("Last_invoice_date->>", last_invoice_date)
-        print("Today date->>", today_date)
-
-        if last_invoice_date != today_date:
-            day_list = today_date.split("-")
-            day_list.append(f"{1:02d}")
-            final_invoice_no = "-".join(day_list)
-            final_invoice_no = f"{branch_id:02d}-" + final_invoice_no
+        if latest_today and latest_today.invoice_number:
+            try:
+                seq = int(latest_today.invoice_number.split("-")[-1]) + 1
+            except Exception:
+                seq = 1
         else:
-            last_invoice_list = latest_invoice_number.split("-")
-            last_invoice_list[-1] = f"{int(last_invoice_list[-1]) + 1:02d}"
-            last_invoice_list[0] = f"{branch_id:02d}"
-            final_invoice_no = "-".join(last_invoice_list)
+            seq = 1
+
+        final_invoice_no = f"{prefix}-{seq:02d}"
 
         invoice.invoice_number = final_invoice_no
 

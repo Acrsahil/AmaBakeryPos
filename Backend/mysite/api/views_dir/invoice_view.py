@@ -76,7 +76,7 @@ class InvoiceViewClass(APIView):
     def post(self, request):
         """Create new invoice"""
         role = self.get_user_role(request.user)
-        my_branch = request.user.branch
+        my_branch = getattr(request.user, "branch", None)
 
         # Check permissions
         if role not in ["ADMIN", "SUPER_ADMIN", "COUNTER", "WAITER", "BRANCH_MANAGER"]:
@@ -85,8 +85,29 @@ class InvoiceViewClass(APIView):
                 status=status.HTTP_403_FORBIDDEN,  #  Use status constants
             )
 
+        # Resolve branch for invoice creation:
+        # - branch-bound roles use their assigned branch
+        # - ADMIN/SUPER_ADMIN may pass `branch` in the request body (frontend already does)
+        branch_id = my_branch.id if my_branch else request.data.get("branch")
+        if not branch_id:
+            return Response(
+                {"success": False, "message": "Branch is required to create an invoice."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Prevent non-global roles from creating invoices for another branch
+        if (
+            my_branch
+            and str(branch_id) != str(my_branch.id)
+            and role not in ["ADMIN", "SUPER_ADMIN"]
+        ):
+            return Response(
+                {"success": False, "message": "You can only create invoices in your own branch."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         serializer = InvoiceSerializer(
-            data=request.data, context={"request": request, "branch": my_branch.id}
+            data=request.data, context={"request": request, "branch": branch_id}
         )
 
         if serializer.is_valid():
