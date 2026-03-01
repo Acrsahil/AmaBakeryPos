@@ -14,3 +14,7 @@ python-dateutil
 channels
 channels-redis
 daphne
+psycopg2-binary
+redis
+django-redis
+django-filter
