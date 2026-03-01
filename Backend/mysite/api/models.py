@@ -102,9 +102,16 @@ class Customer(models.Model):
         related_name="branch_customer",
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['name', 'phone'], 
+                name='unique_customer_per_branch'
+            )
+        ]
+
     def __str__(self):
         return f"{self.name}"
-
 
 class Floor(models.Model):
     branch = models.ForeignKey(

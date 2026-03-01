@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
     BarChart3,
     TrendingUp,
@@ -9,8 +9,10 @@ import {
     ArrowDownRight,
     Filter,
     Download,
-    Loader2
+    Loader2,
+    WifiOff
 } from "lucide-react";
+import { useDashboardSSE } from "@/hooks/useDashboardSSE";
 import {
     XAxis,
     YAxis,
@@ -35,6 +37,20 @@ export default function SuperAdminAnalytics() {
     const [timeRange] = useState("Daily Pulse");
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
+    const [sseConnected, setSSEConnected] = useState(false);
+
+    // SSE: Real-time analytics updates
+    const handleSSEUpdate = useCallback((sseData: any) => {
+        if (sseData.success) {
+            setData((prev: any) => ({
+                ...prev,
+                ...sseData,
+            }));
+            setSSEConnected(true);
+        }
+    }, []);
+
+    useDashboardSSE(null, handleSSEUpdate);
 
     useEffect(() => {
         loadData();
@@ -80,7 +96,26 @@ export default function SuperAdminAnalytics() {
             {/* Header section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900">Global Analytics</h1>
+                    <div className="flex items-center gap-3 mb-1">
+                        <h1 className="text-3xl font-black tracking-tight text-slate-900">Global Analytics</h1>
+                        <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1.5 border ${
+                            sseConnected 
+                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" 
+                                : "bg-slate-100 text-slate-400 border-slate-200"
+                        }`}>
+                            {sseConnected ? (
+                                <>
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    Live
+                                </>
+                            ) : (
+                                <>
+                                    <WifiOff className="h-3 w-3" />
+                                    Connecting...
+                                </>
+                            )}
+                        </div>
+                    </div>
                     <p className="text-sm text-muted-foreground font-medium">Tracking performance across all regions and branches.</p>
                 </div>
                 <div className="flex items-center gap-2">

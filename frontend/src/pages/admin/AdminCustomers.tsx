@@ -15,7 +15,7 @@ import {
     Loader2,
     Trash2
 } from "lucide-react";
-import { fetchCustomers, createCustomer, updateCustomer, deleteCustomer } from "../../api/index.js";
+import { fetchCustomers, createCustomer, updateCustomer, deleteCustomer, fetchInvoicesByCustomer } from "../../api/index.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -52,6 +52,8 @@ export default function AdminCustomers() {
     const [deleting, setDeleting] = useState(false);
     const [editing, setEditing] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [salesHistory, setSalesHistory] = useState<any[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
     const currentUser = getCurrentUser();
     const branchId = currentUser?.branch_id ?? null;
 
@@ -80,17 +82,22 @@ export default function AdminCustomers() {
         try {
             const data = await fetchCustomers();
             // Map API data to our interface, providing defaults for missing fields
-            const mapped: Customer[] = data.map((c: any) => ({
-                id: c.id,
-                name: c.name,
-                email: c.email || "N/A",
-                phone: c.phone || "N/A",
-                address: c.address || "",
-                totalOrders: 0, // Placeholder
-                totalSpent: 0,  // Placeholder
-                lastOrderDate: c.date ? new Date(c.date).toLocaleDateString() : "N/A",
-                branch: c.branch
-            }));
+            const mapped: Customer[] = data.map((c: any) => {
+                const invoices = c.invoice || [];
+                const totalSpent = invoices.reduce((sum: number, inv: any) => sum + (parseFloat(inv.total_amount) || 0), 0);
+
+                return {
+                    id: c.id,
+                    name: c.name,
+                    email: c.email || "N/A",
+                    phone: c.phone || "N/A",
+                    address: c.address || "",
+                    totalOrders: invoices.length,
+                    totalSpent: totalSpent,
+                    lastOrderDate: c.created_at ? new Date(c.created_at).toLocaleDateString() : "N/A",
+                    branch: c.branch
+                };
+            });
 
             const scoped =
                 branchId != null ? mapped.filter((c) => c.branch === branchId) : mapped;
@@ -101,6 +108,23 @@ export default function AdminCustomers() {
         } finally {
             setLoading(false);
         }
+    };
+    const loadCustomerHistory = async (id: number) => {
+        setLoadingHistory(true);
+        try {
+            const data = await fetchInvoicesByCustomer(id);
+            setSalesHistory(data || []);
+        } catch (err: any) {
+            console.error("Failed to load customer history:", err);
+            toast.error("Failed to load sales history");
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
+
+    const handleCustomerClick = (customer: Customer) => {
+        setSelectedCustomer(customer);
+        loadCustomerHistory(customer.id);
     };
 
     const handleCreateCustomer = async () => {
@@ -247,7 +271,7 @@ export default function AdminCustomers() {
                                     <tr
                                         key={customer.id}
                                         className="hover:bg-muted/30 transition-colors group cursor-pointer"
-                                        onClick={() => setSelectedCustomer(customer)}
+                                        onClick={() => handleCustomerClick(customer)}
                                     >
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -272,11 +296,11 @@ export default function AdminCustomers() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                                                {customer.totalOrders} (No data)
+                                            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                                                {customer.totalOrders}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 font-bold text-muted-foreground/50">
+                                        <td className="px-6 py-4 font-bold text-foreground">
                                             Rs.{customer.totalSpent.toLocaleString()}
                                         </td>
                                         <td className="px-6 py-4 text-muted-foreground truncate">
@@ -324,11 +348,11 @@ export default function AdminCustomers() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-muted/50 p-6 rounded-xl text-center">
                                     <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Total Revenue</p>
-                                    <p className="font-bold text-2xl text-muted-foreground/50">Rs.{selectedCustomer.totalSpent.toLocaleString()}</p>
+                                    <p className="font-bold text-2xl text-foreground">Rs.{selectedCustomer.totalSpent.toLocaleString()}</p>
                                 </div>
                                 <div className="bg-muted/50 p-6 rounded-xl text-center">
                                     <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Orders</p>
-                                    <p className="font-bold text-2xl text-muted-foreground/50">{selectedCustomer.totalOrders}</p>
+                                    <p className="font-bold text-2xl text-foreground">{selectedCustomer.totalOrders}</p>
                                 </div>
                             </div>
 
@@ -390,6 +414,50 @@ export default function AdminCustomers() {
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                            {/* Sales History */}
+                            <div className="space-y-4">
+                                <h4 className="font-semibold flex items-center gap-2 text-foreground">
+                                    <ShoppingBag className="h-4 w-4 text-primary" />
+                                    Sales History
+                                </h4>
+                                <div className="border border-border rounded-xl bg-card overflow-hidden">
+                                    {loadingHistory ? (
+                                        <div className="p-8 text-center">
+                                            <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-muted-foreground" />
+                                            <p className="text-xs text-muted-foreground">Fetching history...</p>
+                                        </div>
+                                    ) : salesHistory.length === 0 ? (
+                                        <div className="p-8 text-center">
+                                            <p className="text-sm text-muted-foreground">No purchase history found.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="divide-y divide-border">
+                                            {salesHistory.map((invoice) => (
+                                                <div key={invoice.id} className="p-4 hover:bg-muted/30 transition-colors">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="font-bold text-sm text-foreground">
+                                                            {invoice.invoice_number}
+                                                        </span>
+                                                        <span className="font-black text-sm text-primary">
+                                                            Rs.{parseFloat(invoice.total_amount).toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-[11px]">
+                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                            <Calendar className="h-3 w-3" />
+                                                            {new Date(invoice.created_at).toLocaleDateString()}
+                                                        </div>
+                                                        <StatusBadge
+                                                            status={invoice.payment_status?.toLowerCase() || "pending"}
+                                                            className="h-5 px-1.5 text-[9px]"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="flex gap-3 pt-4">

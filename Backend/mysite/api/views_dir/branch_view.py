@@ -1,6 +1,8 @@
 from rest_framework import status
 from rest_framework.views import APIView, Response
 
+from django.db.models import Sum, Value, DecimalField
+from django.db.models.functions import Coalesce
 from ..models import Branch, ProductCategory, User
 from ..serializer_dir.branch_serializer import BranchSerializers
 
@@ -23,8 +25,10 @@ class BranchViewClass(APIView):
         if id:
             # Single branch with prefetch
             try:
-                branch = Branch.objects.prefetch_related(
-                    "branch_user"  # Assuming User has foreign key to Branch
+                branch = Branch.objects.annotate(
+                    revenue=Coalesce(Sum("invoices__total_amount"), Value(0, output_field=DecimalField()))
+                ).prefetch_related(
+                    "branch_user"
                 ).get(id=id)
 
             except Branch.DoesNotExist:
@@ -58,8 +62,10 @@ class BranchViewClass(APIView):
 
             
         try:
-            # All branches with prefetch (most efficient)
-            branches = Branch.objects.prefetch_related("branch_user").all()
+            # All branches with prefetch and revenue annotation
+            branches = Branch.objects.annotate(
+                revenue=Coalesce(Sum("invoices__total_amount"), Value(0, output_field=DecimalField()))
+            ).prefetch_related("branch_user").all()
         except Exception:
             return Response(
                     {"success": False, "message": "Something went wrong while fetching branches."},

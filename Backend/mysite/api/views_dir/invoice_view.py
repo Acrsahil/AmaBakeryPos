@@ -54,24 +54,24 @@ class InvoiceViewClass(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
         else:
+            # Base filtering
             if role in ["COUNTER", "WAITER", "KITCHEN"]:
                 invoices = Invoice.objects.filter(
                     branch=my_branch, created_at__date=today_date
-                ).order_by("-created_at")
+                ).exclude(payment_status__in=["PAID", "CANCELLED"])
+            elif role == "BRANCH_MANAGER":
+                invoices = Invoice.objects.filter(branch=my_branch)
+            else:
+                invoices = Invoice.objects.all()
 
-                serializer = InvoiceResponseSerializer(invoices, many=True)
-                return Response({"success": True, "data": serializer.data})
+            # Filter by customer if provided
+            customer_id = request.query_params.get("customer")
+            if customer_id:
+                invoices = invoices.filter(customer_id=customer_id)
 
-            if role == "BRANCH_MANAGER":
-                invoices = Invoice.objects.filter(branch=my_branch).order_by(
-                    "-created_at"
-                )
-                serializer = InvoiceResponseSerializer(invoices, many=True)
-                return Response({"success": True, "data": serializer.data})
-
-            invoices = Invoice.objects.all().order_by("-created_at")
+            invoices = invoices.order_by("-created_at")
             serializer = InvoiceResponseSerializer(invoices, many=True)
-            return Response({"success": True, "data": serializer.data})
+            return Response({"success": True, "count": invoices.count(), "data": serializer.data})
 
     # ------------------ POST (Create) ------------------
     @transaction.atomic
@@ -161,7 +161,7 @@ class InvoiceViewClass(APIView):
         # Don't allow modifying paid/cancelled invoices
 
         print("i", invoice.payment_status)
-        if invoice.payment_status in ["CANCELLED"]:
+        if invoice.payment_status in ["PAID", "CANCELLED"]:
             print("i am inside patch method!")
             return Response(
                 {

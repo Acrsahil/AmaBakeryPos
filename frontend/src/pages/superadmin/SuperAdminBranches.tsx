@@ -303,14 +303,14 @@ export default function SuperAdminBranches() {
                     </DialogHeader>
 
                     <div className="p-6 space-y-6">
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-1">
                                 <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Branch Name</Label>
                                 <p className="font-bold text-base text-slate-900">{selectedBranch?.name}</p>
                             </div>
-                            <div className="space-y-1">
+                            <div className="space-y-1 text-right">
                                 <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Location</Label>
-                                <p className="font-bold text-base text-slate-900 flex items-center gap-1">
+                                <p className="font-bold text-base text-slate-900 flex items-center justify-end gap-1">
                                     <MapPin className="h-3 w-3 text-slate-400" />
                                     {selectedBranch?.location}
                                 </p>
@@ -318,6 +318,10 @@ export default function SuperAdminBranches() {
                             <div className="space-y-1">
                                 <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Tables</Label>
                                 <p className="font-black text-xl text-primary">{selectedBranch?.total_tables || 0}</p>
+                            </div>
+                            <div className="space-y-1 text-right">
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lifetime Revenue</Label>
+                                <p className="font-black text-xl text-emerald-600">Rs. {(parseFloat(selectedBranch?.revenue as any) || 0).toLocaleString()}</p>
                             </div>
                         </div>
 

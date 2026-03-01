@@ -161,14 +161,14 @@ let dashboardPollCallbacks = new Set();
 export function startDashboardPolling(onUpdate, interval = DASHBOARD_POLL_INTERVAL) {
   // Add callback to set
   dashboardPollCallbacks.add(onUpdate);
-  
+
   // Start polling if not already active
   if (!dashboardPollingActive) {
-    console.log(`🔄 Starting dashboard polling every ${interval/1000} seconds...`);
+    console.log(`🔄 Starting dashboard polling every ${interval / 1000} seconds...`);
     dashboardPollingActive = true;
     pollDashboard(interval);
   }
-  
+
   // Return function to stop polling for this specific callback
   return () => {
     dashboardPollCallbacks.delete(onUpdate);
@@ -195,13 +195,13 @@ export function stopDashboardPolling() {
  */
 async function pollDashboard(interval) {
   if (!dashboardPollingActive) return;
-  
+
   try {
     console.log('📊 Polling dashboard...', new Date().toLocaleTimeString());
-    
+
     // Use your existing apiFetch to get dashboard data
     const data = await fetchDashboardDetails();
-    
+
     // Notify all callbacks
     dashboardPollCallbacks.forEach(callback => {
       try {
@@ -210,15 +210,15 @@ async function pollDashboard(interval) {
         console.error('Error in dashboard polling callback:', err);
       }
     });
-    
+
     console.log('✅ Dashboard updated', new Date().toLocaleTimeString());
-    
+
   } catch (error) {
     console.error('❌ Dashboard polling failed:', error);
-    
+
     // Don't stop polling on error, just log it
     // The apiFetch will handle token refresh automatically
-    
+
   } finally {
     // Schedule next poll
     if (dashboardPollingActive) {
@@ -618,4 +618,11 @@ export async function fetchStaffReport(branchId = null) {
  */
 export async function refreshDashboard(branchId = null) {
   return fetchDashboardDetails(branchId);
+}
+
+export async function fetchInvoicesByCustomer(customerId) {
+  const res = await apiFetch(`/api/invoice/?customer=${customerId}`);
+  const data = await safeJson(res);
+  if (!res.ok) throw new Error(data?.message || "Failed to fetch invoices for customer");
+  return data.data;
 }
