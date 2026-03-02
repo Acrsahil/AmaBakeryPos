@@ -43,22 +43,16 @@ DEBUG = os.getenv("DJANGO_DEBUG", "True") == "True"
 if DEBUG:
     ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1"]
 else:
-    # Get Railway domain from environment
-    RAILWAY_STATIC_URL = os.getenv("RAILWAY_STATIC_URL", "")
-    RAILWAY_PUBLIC_DOMAIN = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
-    
-    allowed_hosts = os.getenv("ALLOWED_HOSTS", "").split(",")
-    
-    # Add Railway domains
-    if RAILWAY_STATIC_URL:
-        allowed_hosts.append(RAILWAY_STATIC_URL)
-    if RAILWAY_PUBLIC_DOMAIN:
-        allowed_hosts.append(RAILWAY_PUBLIC_DOMAIN)
-    
-    # Add wildcard for Railway
-    allowed_hosts.append(".railway.app")
-    
-    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts if host.strip()]
+    ALLOWED_HOSTS = [
+    os.environ.get('RAILWAY_PUBLIC_DOMAIN', ''),
+    os.environ.get('RAILWAY_PRIVATE_DOMAIN', ''),
+    'localhost',
+    '127.0.0.1',
+    '.railway.app',  # wildcard fallback
+]
+
+# Remove empty strings
+ALLOWED_HOSTS = [h for h in ALLOWED_HOSTS if h]
 
 # ==============================================================================
 # REDIS/VALKEY CONFIGURATION
