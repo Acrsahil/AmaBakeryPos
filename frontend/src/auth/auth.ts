@@ -77,10 +77,15 @@ export function getCurrentUser() {
 
   // Fallback for legacy data (if any)
   const u = localStorage.getItem("currentUser");
-  return u ? JSON.parse(u) : null;
+  if (!u || u === "undefined") return null;
+  try {
+    return JSON.parse(u);
+  } catch {
+    return null;
+  }
 }
 
 export async function logout() {
   await clearTokens();
-  window.location.href = "/login";
+  window.location.replace("/login");
 }

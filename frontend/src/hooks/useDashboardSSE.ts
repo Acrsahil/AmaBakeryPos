@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
-import { getAccessToken } from "@/api/index.js";
+import { getAccessToken, refreshAccessToken } from "@/api/index.js";
+import { API_BASE_URL as baseUrl } from "@/api/config";
 
 type DashboardData = {
   success: boolean;
@@ -35,8 +36,7 @@ export function useDashboardSSE(
       eventSourceRef.current.close();
     }
 
-    const rawBase = import.meta.env.VITE_API_BASE_URL || "https://amabakerypos-production.up.railway.app/";
-    const baseUrl = rawBase.replace(/\/+$/, "");
+    // baseUrl is imported from config
 
     // Build URL with params
     const queryParams = new URLSearchParams();
@@ -72,9 +72,23 @@ export function useDashboardSSE(
       }
     });
 
-    eventSource.onerror = (error) => {
+    eventSource.onerror = async (error) => {
       console.error("[SSE] Error:", error);
       eventSource.close();
+
+      // If we're unauthorized, try to refresh token once
+      const token = getAccessToken();
+      const isExpired = !token || (JSON.parse(atob(token.split('.')[1])).exp * 1000 < Date.now());
+
+      if (isExpired) {
+        console.log("[SSE] Token expired, attempting refresh before reconnecting...");
+        const newToken = await refreshAccessToken();
+        if (!newToken) {
+          console.warn("[SSE] Refresh failed, stopping reconnection.");
+          window.dispatchEvent(new CustomEvent("unauthorized"));
+          return;
+        }
+      }
 
       // Reconnect after 5 seconds
       reconnectTimeoutRef.current = setTimeout(() => {

@@ -1,9 +1,7 @@
-const RAW_BASE = import.meta.env.VITE_API_BASE_URL || "https://amabakerypos-production.up.railway.app/";
-const apiBaseUrl = RAW_BASE.replace(/\/+$/, ""); // remove trailing /
+import { API_BASE_URL, WS_BASE_URL, DASHBOARD_POLL_INTERVAL } from "./config";
+export { API_BASE_URL, WS_BASE_URL, DASHBOARD_POLL_INTERVAL };
 
-// --- POLLING CONFIGURATION ---
-// You can change this value to adjust polling interval
-export const DASHBOARD_POLL_INTERVAL = 3000; // 30 seconds (change this as needed)
+const apiBaseUrl = API_BASE_URL; // Internal helper name
 
 // --- TOKEN MANAGEMENT ---
 // In-memory access token (more secure against XSS)
@@ -16,22 +14,27 @@ function saveTokens(tokens) {
 
 // Clear tokens (logout)
 export async function clearTokens() {
-  // Clear local state first
+  // 1. Clear local state (SYNCHRONOUS)
   _accessToken = null;
   localStorage.removeItem("currentUser");
   localStorage.removeItem("currentWaiter");
+  localStorage.removeItem("token");
+  localStorage.removeItem("selectedBranch");
+  localStorage.removeItem("kitchenFloorFilter");
 
-  // Also call backend logout to clear cookie
+  // Set a flag to prevent immediate auto-relogin during this session
+  localStorage.setItem("just_logged_out", "true");
+
+  // 2. Call backend logout to clear cookie
   try {
-    const response = await fetch(apiBaseUrl + "/api/logout/", {
+    const res = await fetch(apiBaseUrl + "/api/logout/", {
       method: "POST",
       credentials: "include",
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      headers: { 'Content-Type': 'application/json' }
     });
-    if (!response.ok) {
-      console.warn("Backend logout returned non-OK status");
+
+    if (!res.ok) {
+      console.warn("Backend logout responded with status:", res.status);
     }
   } catch (err) {
     console.error("Logout API call failed:", err);
@@ -43,35 +46,75 @@ export function getAccessToken() {
   return _accessToken;
 }
 
+// --- REFRESH TOKEN MUTEX (Auth Loop Fix) ---
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+function onTokenRefreshed(newToken) {
+  refreshSubscribers.map(cb => cb(newToken));
+  refreshSubscribers = [];
+}
+
+function addRefreshSubscriber(cb) {
+  refreshSubscribers.push(cb);
+}
+
 // Refresh the access token
 export async function refreshAccessToken() {
-  const url = apiBaseUrl + "/api/token/refresh/";
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include" // This is key to send the refresh cookie
-  });
-
-  if (!res.ok) {
-    _accessToken = null;
-    localStorage.removeItem("currentUser");
-    localStorage.removeItem("currentWaiter");
-    throw new Error("Session expired. Please login again.");
+  // If a refresh is already in progress, wait for it
+  if (isRefreshing) {
+    return new Promise(resolve => {
+      addRefreshSubscriber(token => resolve(token));
+    });
   }
 
-  const data = await res.json();
-  _accessToken = data.access;
-  return _accessToken;
+  isRefreshing = true;
+  const url = apiBaseUrl + "/api/token/refresh/";
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include" // This is key to send the refresh cookie
+    });
+
+    if (res.status === 200) {
+      const data = await res.json();
+      _accessToken = data.access;
+      onTokenRefreshed(_accessToken);
+      return _accessToken;
+    } else {
+      // 400/401 means session is truly dead
+      _accessToken = null;
+      localStorage.removeItem("currentUser");
+      localStorage.removeItem("currentWaiter");
+      onTokenRefreshed(null);
+      // Don't throw here to avoid unhandled rejections in parallel calls
+      return null;
+    }
+  } catch (err) {
+    console.error("Token refresh network failure:", err);
+    onTokenRefreshed(null);
+    return null;
+  } finally {
+    isRefreshing = false;
+  }
 }
 
 // Check if we have a session to restore
 export async function initializeAuth() {
   if (_accessToken) return true;
 
+  // If the user just logged out, don't try to revive the session via cookie
+  // This prevents the loop if the cookie delete hasn't propagated yet
+  if (localStorage.getItem("just_logged_out") === "true") {
+    return false;
+  }
+
   try {
     // Attempt to refresh using cookie
-    await refreshAccessToken();
-    return true;
+    const token = await refreshAccessToken();
+    return !!token;
   } catch (err) {
     // No valid refresh cookie or refresh failed
     return false;
@@ -108,14 +151,19 @@ async function apiFetch(endpoint, options = {}) {
   // If 401 Unauthorized, try to refresh token once
   // EXCEPTION: Don't try to refresh if we're actually TRYING to login
   if (response.status === 401 && !endpoint.includes("/api/token/")) {
-    console.warn("Access token expired, attempting refresh...");
+    console.warn("Access token expired, attempting refresh for:", endpoint);
     try {
       const newToken = await refreshAccessToken();
-      // Retry with new token
-      fetchOptions.headers["Authorization"] = `Bearer ${newToken}`;
-      response = await fetch(url, fetchOptions);
+      if (newToken) {
+        // Retry with new token
+        headers["Authorization"] = `Bearer ${newToken}`;
+        response = await fetch(url, { ...fetchOptions, headers });
+      } else {
+        // Refresh failed (no login info)
+        window.dispatchEvent(new CustomEvent("unauthorized"));
+      }
     } catch (refreshErr) {
-      console.error("Refresh failed:", refreshErr);
+      console.error("Refresh logic error:", refreshErr);
       window.dispatchEvent(new CustomEvent("unauthorized"));
     }
   }
@@ -263,6 +311,10 @@ export async function loginUsers(username, password) {
   if (!data?.access) {
     throw new Error("Login response missing access token.");
   }
+
+  // Clear the logout flag if it exists
+  localStorage.removeItem("just_logged_out");
+
   saveTokens(data);
   return data;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
+import { WS_BASE_URL } from "../api/config";
 
 type MessageHandler = (data: { type: string; invoice_id?: string; status?: string }) => void;
 
@@ -6,10 +7,7 @@ export function useOrdersWebSocket(onMessage: MessageHandler) {
   const socketRef = useRef<WebSocket | null>(null);
 
   const connect = useCallback(() => {
-    const rawBase = import.meta.env.VITE_API_BASE_URL || "https://amabakerypos-production.up.railway.app/";
-    const httpStripped = rawBase.replace(/\/+$/, "");
-    const wsBase = httpStripped.replace(/^http/, "ws");
-    const socket = new WebSocket(wsBase + "/ws/orders/");
+    const socket = new WebSocket(WS_BASE_URL + "/ws/orders/");
 
     socket.onopen = () => {
       console.log("[WS] Orders socket connected");

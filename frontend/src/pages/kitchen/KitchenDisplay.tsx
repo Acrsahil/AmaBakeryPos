@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { getCurrentUser, logout } from "../../auth/auth";
 import { ChangePasswordModal } from "@/components/auth/ChangePasswordModal";
 import { fetchInvoices, fetchProducts, fetchCategories, updateInvoiceStatus, fetchTables } from "../../api/index.js";
+import { WS_BASE_URL } from "../../api/config";
 
 export default function KitchenDisplay() {
   const navigate = useNavigate();
@@ -70,11 +71,7 @@ export default function KitchenDisplay() {
 
   // WebSocket: listen for new invoices and refresh kitchen data
   useEffect(() => {
-    // Derive websocket base from API base URL env
-    const rawBase = import.meta.env.VITE_API_BASE_URL || "https://amabakerypos-production.up.railway.app/";
-    const httpStripped = rawBase.replace(/\/+$/, "");
-    const wsBase = httpStripped.replace(/^http/, "ws");
-    const socket = new WebSocket(wsBase + "/ws/kitchen/");
+    const socket = new WebSocket(WS_BASE_URL + "/ws/kitchen/");
 
     socket.onopen = () => {
       setSocketConnected(true);
