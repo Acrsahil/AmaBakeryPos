@@ -7,9 +7,6 @@ nixPkgs = [
 ]
 
 
-[environments]
-PYTHON_VERSION = "3.10.12"  # Specify a different version
-
 
 [phases.install]
 cmds = ["pip install -r requirements.txt"]
