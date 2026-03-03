@@ -321,8 +321,7 @@ CORS_ALLOWED_ORIGINS = [
 
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-     # ✅ ADD THIS:
-    "https://ama-bakery-8fffdneth-acrsahils-projects.vercel.app",
+    "https://ama-bakery-pos.vercel.app/"
 ]
 
 if RAILWAY_PUBLIC_DOMAIN:
