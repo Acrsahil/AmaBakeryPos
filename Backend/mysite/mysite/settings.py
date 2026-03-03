@@ -255,17 +255,16 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "api.middleware.RateLimitHeadersMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  # ← MUST BE FIRST
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
+    "api.middleware.RateLimitHeadersMiddleware",  # ← Move your custom middleware down
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
-]
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",]
 
 ROOT_URLCONF = "mysite.urls"
 
@@ -317,6 +316,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # ==============================================================================
 
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]

@@ -35,7 +35,7 @@ export function useDashboardSSE(
       eventSourceRef.current.close();
     }
 
-    const rawBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+    const rawBase = import.meta.env.VITE_API_BASE_URL || "https://amabakerypos-production.up.railway.app/";
     const baseUrl = rawBase.replace(/\/+$/, "");
 
     // Build URL with params
