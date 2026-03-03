@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models.base import CASCADE
 from django.utils import timezone
 
 
@@ -15,7 +16,14 @@ class Branch(models.Model):
         return f"{self.name}"
 
 
+
+class Kitchentype(models.Model):
+    name = models.CharField(max_length=20)
+    branch = models.ForeignKey(Branch,on_delete=models.CASCADE,related_name="kitchentype_branch")
+
+
 class ProductCategory(models.Model):
+    kitchentype = models.ForeignKey(Kitchentype,on_delete=models.PROTECT,related_name="kitchen_type")
     branch = models.ForeignKey(
         Branch, on_delete=models.CASCADE, related_name="product_categories"
     )
@@ -37,6 +45,7 @@ class User(AbstractUser):
         null=True,
         blank=True,
     )
+    kitchentype = models.ForeignKey(Kitchentype,on_delete=CASCADE,blank=True,null=True)
 
     USER_TYPE_CHOICES = [
         ("ADMIN", "Admin"),

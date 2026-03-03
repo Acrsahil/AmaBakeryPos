@@ -13,6 +13,7 @@ from .models import (
     Product,
     ProductCategory,
     User,
+    Kitchentype
 )
 
 
@@ -23,6 +24,7 @@ class CustomUserAdmin(UserAdmin):
         "full_name",
         "user_type",
         "branch",
+        "kitchentype"
     )
 
     list_filter = UserAdmin.list_filter + ("user_type", "branch", "full_name")
@@ -49,6 +51,7 @@ class ProductCategoryAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
+        "kitchentype"
     )
     list_filter = ("name", "id")
     search_fields = ("name", "branch.name")
@@ -157,3 +160,7 @@ class FloorAdmin(admin.ModelAdmin):
 @admin.register(ItemActivity)
 class ItemActivityAdmin(admin.ModelAdmin):
     list_display = ("id", "types", "change", "quantity", "remarks", "product")
+
+@admin.register(Kitchentype)
+class KitchentypeActivityAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "branch")
