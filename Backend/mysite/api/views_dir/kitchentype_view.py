@@ -23,6 +23,7 @@ class KitchenViewClass(APIView):
                     return Response({"success":True,"data" :serilizer.data})
 
         else:
+            if role in ["ADMIN","SUPER_ADMIN"]:
                 kitchentype = Kitchentype.objects.all()
                 serilizer = KitchenTypeSerializer(kitchentype)
                 return Response({"success":True,"data" :serilizer.data})
