@@ -3,7 +3,7 @@
  * These values are pulled from the .env file in the frontend root.
  */
 
-const RAW_BASE = import.meta.env.VITE_API_BASE_URL || "amabakerypos-production.up.railway.app";
+const RAW_BASE = import.meta.env.VITE_API_BASE_URL || "https://amabakerypos-production.up.railway.app";
 
 // Ensure no trailing slash
 export const API_BASE_URL = RAW_BASE.replace(/\/+$/, "");
