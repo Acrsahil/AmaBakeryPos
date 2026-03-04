@@ -12,7 +12,7 @@ from .item_activity_serializer import ItemActivitySerializer
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
-
+    product_kitchen_type = serializers.CharField(source="product.category.kitchentype",read_only = True)
     class Meta:
         model = InvoiceItem
         fields = [
@@ -21,6 +21,7 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
             "quantity",
             "unit_price",
             "discount_amount",
+            "product_kitchen_type"
         ]
 
 

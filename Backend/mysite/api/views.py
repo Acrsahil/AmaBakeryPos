@@ -23,6 +23,7 @@ from .views_dir.payment_view import PaymentClassView
 # custom
 from .views_dir.product_view import ProductViewClass
 from .views_dir.users_view import UserViewClass
+from .views_dir.kitchentype_view import KitchenViewClass
 
 
 @api_view(['GET','HEAD'])
@@ -132,4 +133,5 @@ ItemActivityView = item_activity_view.ItemActivityClassView
 DashboardView = DashboardViewClass
 ReportDashboardView = ReportDashboardViewClass
 StaffReportView = StaffReportViewClass
+KitchenTypeView = KitchenViewClass
 

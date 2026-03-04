@@ -20,6 +20,8 @@ class Branch(models.Model):
 class Kitchentype(models.Model):
     name = models.CharField(max_length=20)
     branch = models.ForeignKey(Branch,on_delete=models.CASCADE,related_name="kitchentype_branch")
+    def __str__(self):
+        return self.name
 
 
 class ProductCategory(models.Model):

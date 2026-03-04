@@ -47,4 +47,6 @@ urlpatterns = [
     ),
     path("dashboard/stream/", dashboard_sse, name="dashboard-sse"),
     path("test-rate-limit/", views.test_rate_limit, name="test-rate-limit"),
+    path("kitchen-type/", views.KitchenTypeView.as_view(), name="kitchen-type"),
+    path("kitchen-type/<int:id>/", views.KitchenTypeView.as_view(), name="kitchen-type"),
 ]
