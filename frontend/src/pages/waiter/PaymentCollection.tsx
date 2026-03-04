@@ -206,7 +206,13 @@ export default function PaymentCollection() {
                       Table {order.table_no || order.floor_name || '??'}
                     </span>
                   </div>
-                  <StatusBadge status={order.invoice_status?.toLowerCase()} />
+                  <StatusBadge
+                    status={
+                      (order.payment_status === 'PAID' || (order.payment_status === 'PARTIAL' && order.received_by_waiter))
+                        ? 'paid'
+                        : order.invoice_status?.toLowerCase()
+                    }
+                  />
                 </div>
 
                 <div className="p-4">
@@ -229,7 +235,7 @@ export default function PaymentCollection() {
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">Amount Due</p>
-                      <p className="text-lg font-black text-primary leading-none">Rs.{Number(order.due_amount || order.total_amount).toFixed(2)}</p>
+                      <p className="text-lg font-black text-primary leading-none">Rs.{Number(order.due_amount ?? order.total_amount).toFixed(2)}</p>
                     </div>
                   </div>
                 </div>
