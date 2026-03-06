@@ -25,7 +25,10 @@ type SSEHandler = (data: DashboardData) => void;
 
 export function useDashboardSSE(
   branchId: number | string | null | undefined,
-  onUpdate: SSEHandler
+  onUpdate: SSEHandler,
+  timeframe: string = "daily",
+  startDate?: string,
+  endDate?: string
 ) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -36,12 +39,19 @@ export function useDashboardSSE(
       eventSourceRef.current.close();
     }
 
-    // baseUrl is imported from config
-
     // Build URL with params
     const queryParams = new URLSearchParams();
     if (branchId) {
       queryParams.append("branch_id", branchId.toString());
+    }
+    if (timeframe) {
+      queryParams.append("timeframe", timeframe);
+    }
+    if (startDate) {
+      queryParams.append("start_date", startDate);
+    }
+    if (endDate) {
+      queryParams.append("end_date", endDate);
     }
 
     const token = getAccessToken();
@@ -55,7 +65,7 @@ export function useDashboardSSE(
     const eventSource = new EventSource(url, { withCredentials: true });
 
     eventSource.onopen = () => {
-      console.log("[SSE] Dashboard stream connected");
+      console.log(`[SSE] Dashboard stream connected (${timeframe}${branchId ? ', branch:' + branchId : ''})`);
     };
 
     eventSource.addEventListener("connected", (event) => {
@@ -98,7 +108,7 @@ export function useDashboardSSE(
     };
 
     eventSourceRef.current = eventSource;
-  }, [branchId, onUpdate]);
+  }, [branchId, onUpdate, timeframe, startDate, endDate]);
 
   useEffect(() => {
     connect();

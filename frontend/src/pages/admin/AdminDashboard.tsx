@@ -17,8 +17,23 @@ import {
   ExternalLink,
   Layers,
   Wifi,
-  WifiOff
+  WifiOff,
+  Filter,
+  CalendarDays,
+  ChevronDown,
+  Calendar as CalendarIcon
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel
+} from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import {
   BarChart,
   Bar,
@@ -33,10 +48,13 @@ import {
   AreaChart,
   Area,
   Line,
-  ComposedChart
+  ComposedChart,
+  LabelList,
+  Legend
 } from "recharts";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const COLORS = ['hsl(32, 95%, 44%)', 'hsl(15, 70%, 50%)', 'hsl(142, 71%, 45%)', 'hsl(199, 89%, 48%)'];
@@ -53,6 +71,13 @@ export default function AdminDashboard() {
   const [floors, setFloors] = useState<any[]>([]);
   const [sseConnected, setSSEConnected] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+
+  // Filter states
+  const [timeframe, setTimeframe] = useState("daily");
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined, to: Date | undefined }>({
+    from: undefined,
+    to: undefined
+  });
 
   // SSE: Real-time dashboard updates
   const handleSSEUpdate = useCallback((data: any) => {
@@ -75,23 +100,34 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  useDashboardSSE(user?.branch_id, handleSSEUpdate);
+  useDashboardSSE(
+    user?.branch_id,
+    handleSSEUpdate,
+    timeframe,
+    dateRange.from ? format(dateRange.from, "yyyy-MM-dd") : undefined,
+    dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : undefined
+  );
 
   useEffect(() => {
     loadDashboardData();
     loadRecentOrders();
     loadTableData();
-  }, [user?.branch_id]);
+  }, [user?.branch_id, timeframe, dateRange]);
+
+  const getFilters = () => {
+    const params: any = { timeframe };
+    if (timeframe === "custom" && dateRange.from && dateRange.to) {
+      params.start_date = format(dateRange.from, "yyyy-MM-dd");
+      params.end_date = format(dateRange.to, "yyyy-MM-dd");
+    }
+    return params;
+  };
 
   const loadDashboardData = async () => {
     try {
-      // api.md spec:
-      // - ADMIN/SUPER_ADMIN with no branch_id → global summary (total_sales, total_branch, etc.)
-      // - ADMIN/SUPER_ADMIN with branch_id  → branch-specific today's stats
-      // - BRANCH_MANAGER                     → branch-specific today's stats (no id in URL)
       const isSuperOrAdmin = user?.is_superuser || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
       const branchId = isSuperOrAdmin ? (user?.branch_id || null) : null;
-      const data = await fetchDashboardDetails(branchId);
+      const data = await fetchDashboardDetails(branchId, getFilters());
       setDashboardData(data);
     } catch (error) {
       console.error("Failed to fetch dashboard details:", error);
@@ -117,12 +153,10 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       const data = await fetchInvoices();
-      // Sort by ID descending (newest first)
       const sorted = Array.isArray(data)
         ? [...data].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         : [];
 
-      // For branch-scoped admin/super admin, only show orders from that branch
       const isSuperOrAdmin =
         user?.is_superuser || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
       const hasBranchScope = isSuperOrAdmin && user?.branch_id;
@@ -134,158 +168,179 @@ export default function AdminDashboard() {
         )
         : sorted;
 
-      // Show only top 5 recent
       setRecentOrders(filtered.slice(0, 5));
     } catch (err: any) {
-      // Slient fail for dashboard recent orders if it's not the primary focus
       console.error("Dashboard recent orders failed:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Determine if we're showing global summary (admin/superadmin with no branch)
-  const isSuperOrAdmin = user?.is_superuser || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
-  const isGlobalView = isSuperOrAdmin && !user?.branch_id;
+  const isSuperOrAdminView = user?.is_superuser || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  const isGlobalView = isSuperOrAdminView && !user?.branch_id;
 
-  // Build weekly chart data from API response (handles both key spellings)
-  const weeklySalesRaw = dashboardData?.weekly_sales || dashboardData?.Weekely_Sales || dashboardData?.Weekly_sales || {};
-  const weeklyChartData = [
-    { day: 'Mon', sales: weeklySalesRaw.monday || 0 },
-    { day: 'Tue', sales: weeklySalesRaw.tuesday || 0 },
-    { day: 'Wed', sales: weeklySalesRaw.wednesday || 0 },
-    { day: 'Thu', sales: weeklySalesRaw.thursday || 0 },
-    { day: 'Fri', sales: weeklySalesRaw.friday || 0 },
-    { day: 'Sat', sales: weeklySalesRaw.saturday || 0 },
-    { day: 'Sun', sales: weeklySalesRaw.sunday || 0 },
-  ];
-
-  const hourlyChartData = dashboardData?.Hourly_sales || [];
-
-  // Peak hour: use API peak_hours when present, else derive from Hourly_sales (hour with max sales)
   const peakHourDisplay = (() => {
     const peakHours = dashboardData?.peak_hours;
     if (Array.isArray(peakHours) && peakHours.length > 0) {
       return peakHours.join(", ");
-    }
-    const hourly = dashboardData?.Hourly_sales || [];
-    if (hourly.length > 0) {
-      const maxEntry = hourly.reduce((best: any, cur: any) =>
-        (cur?.sales ?? 0) > (best?.sales ?? 0) ? cur : best
-      );
-      return maxEntry?.hour ?? "—";
     }
     return "—";
   })();
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Top Navigation & Filters */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
-            <div className="bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1 border border-primary/20">
-              <MapPin className="h-3 w-3" />
-              {branchLabel}
-            </div>
-            <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md flex items-center gap-1 border ${sseConnected
-              ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-              : "bg-slate-100 text-slate-400 border-slate-200"
-              }`}>
-              {sseConnected ? (
-                <>
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live
-                </>
-              ) : (
-                <>
-                  <WifiOff className="h-3 w-3" />
-                  Offline
-                </>
-              )}
-            </div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+            Greetings, {user?.name?.split(' ')[0] || 'Admin'}
+          </h1>
+          <div className="flex items-center gap-2 text-slate-500 font-medium">
+            <MapPin className="h-4 w-4 text-primary" />
+            <span>{branchLabel}</span>
+            <span className="text-slate-200">|</span>
+            <span className="text-xs uppercase tracking-widest font-bold text-slate-400">
+              {timeframe} view
+            </span>
           </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all",
+            sseConnected ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : "bg-slate-100 text-slate-400 border border-slate-200"
+          )}>
+            <div className={cn("h-1.5 w-1.5 rounded-full", sseConnected ? "bg-emerald-500 animate-pulse" : "bg-slate-400")} />
+            {sseConnected ? "Live" : "Polling"}
+          </div>
+
+          {/* Timeframe Selector */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="h-11 rounded-xl border-2 font-bold px-4 hover:bg-slate-50 transition-all border-slate-100 shadow-sm gap-2">
+                <Filter className="h-4 w-4 text-primary" />
+                <span className="capitalize">{timeframe}</span>
+                <ChevronDown className="h-3 w-3 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl border-none shadow-2xl bg-white/95 backdrop-blur-xl">
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground px-2 py-1.5 font-black">Select Period</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setTimeframe("daily")} className="rounded-xl font-bold text-sm cursor-pointer hover:bg-slate-50 py-3">Today</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTimeframe("weekly")} className="rounded-xl font-bold text-sm cursor-pointer hover:bg-slate-50 py-3">Weekly</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTimeframe("monthly")} className="rounded-xl font-bold text-sm cursor-pointer hover:bg-slate-50 py-3">Monthly</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTimeframe("yearly")} className="rounded-xl font-bold text-sm cursor-pointer hover:bg-slate-50 py-3">Yearly</DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-slate-100 my-1" />
+              <DropdownMenuItem onClick={() => setTimeframe("custom")} className="rounded-xl font-bold text-sm cursor-pointer hover:bg-slate-50 py-3 text-primary">Custom Range</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Custom Date Range Popover */}
+          {timeframe === "custom" && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("h-11 rounded-xl border-2 font-bold px-4 border-slate-100 shadow-sm gap-2", !dateRange.from && "text-muted-foreground")}>
+                  <CalendarIcon className="h-4 w-4" />
+                  {dateRange.from ? (
+                    dateRange.to ? (
+                      <>{format(dateRange.from, "MMM dd")} - {format(dateRange.to, "MMM dd")}</>
+                    ) : (
+                      format(dateRange.from, "MMM dd")
+                    )
+                  ) : (
+                    "Pick Dates"
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-3xl overflow-hidden" align="end">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange.from}
+                  selected={{ from: dateRange.from, to: dateRange.to }}
+                  onSelect={(range: any) => setDateRange({ from: range?.from, to: range?.to })}
+                  numberOfMonths={2}
+                  className="p-4"
+                />
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {isGlobalView ? (
-          // Global summary stats for Admin/SuperAdmin (no branch_id)
           <>
             <StatCard
-              title="Total Network Sales"
-              value={`Rs.${dashboardData?.total_sales?.toLocaleString() || 0}`}
+              title="Global Sales"
+              value={`Rs.${dashboardData?.total_sum?.toLocaleString() || 0}`}
               icon={DollarSign}
             />
             <StatCard
-              title="Total Branches"
-              value={dashboardData?.total_branch || 0}
+              title="Branches"
+              value={dashboardData?.total_count_branch || 0}
               icon={ShoppingBag}
             />
             <StatCard
               title="Total Users"
-              value={dashboardData?.total_user || 0}
+              value={dashboardData?.total_user_count || 0}
               icon={TrendingUp}
             />
             <StatCard
-              title="Total Orders"
+              title={`${timeframe} Orders`}
               value={dashboardData?.total_count_order || 0}
               icon={ShoppingBag}
-              subtitle={`Avg: Rs.${dashboardData?.average_order_value?.toFixed(0) || 0}`}
+              subtitle={`Avg Order (${timeframe}): Rs.${dashboardData?.average_order_value?.toFixed(0) || 0}`}
             />
           </>
         ) : (
-          // Branch-specific stats
           <>
             <StatCard
-              title="Today's Sales"
+              title={`${timeframe} Sales`}
               value={`Rs.${dashboardData?.today_sales?.toLocaleString() || 0}`}
               icon={DollarSign}
               trend={{ value: Number(Math.abs(dashboardData?.sales_percent || 0).toFixed(1)), isPositive: (dashboardData?.sales_percent || 0) >= 0 }}
             />
             <StatCard
-              title="Total Orders"
+              title={`${timeframe} Orders`}
               value={dashboardData?.total_orders || 0}
               icon={ShoppingBag}
               trend={{ value: Number(Math.abs(dashboardData?.order_percent || 0).toFixed(1)), isPositive: (dashboardData?.order_percent || 0) >= 0 }}
             />
             <StatCard
-              title="Avg Order Value"
+              title={`Avg Order (${timeframe})`}
               value={`Rs.${dashboardData?.avg_orders ? Number(dashboardData.avg_orders).toFixed(0) : 0}`}
               icon={TrendingUp}
+              trend={{ value: Number(Math.abs(dashboardData?.avg_order_percent || 0).toFixed(1)), isPositive: (dashboardData?.avg_order_percent || 0) >= 0 }}
             />
             <StatCard
               title="Peak Hour"
               value={peakHourDisplay}
               icon={Clock}
-              subtitle="Busiest today"
+              subtitle="Busiest time"
             />
           </>
         )}
       </div>
 
-      {/* Distribution Charts Row */}
+      {/* Main Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Category Breakdown */}
+        {/* Category breakdown bar chart */}
         <div className="card-elevated p-8">
           <div className="mb-6 text-center">
-            <h3 className="text-lg font-black uppercase tracking-tight">Sales by Category (All Time)</h3>
-            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Revenue split by type</p>
+            <h3 className="text-lg font-black uppercase tracking-tight capitalize">{timeframe} Sales by Category</h3>
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{timeframe} Revenue split</p>
           </div>
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={(dashboardData?.total_sales_per_category || []).map((item: any) => ({
-                  name: item.product__category__name || 'Unknown',
-                  value: parseFloat(String(item.category_total_sales || 0)) || 0,
-                  percent: parseFloat(String(item.category_percent || 0)) || 0
+                  name: item.product__category__name || 'Other',
+                  value: parseFloat(String(item.category_total_sales || 0)) || 0
                 }))}
                 layout="vertical"
-                margin={{ left: 10, right: 30, top: 10, bottom: 10 }}
               >
-                <XAxis type="number" hide domain={[0, 'auto']} />
+                <XAxis type="number" hide />
                 <YAxis
                   dataKey="name"
                   type="category"
@@ -296,404 +351,216 @@ export default function AdminDashboard() {
                 />
                 <Tooltip
                   cursor={{ fill: 'rgba(0,0,0,0.02)' }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}
                   formatter={(value: any) => [`Rs.${Number(value).toLocaleString()}`, 'Sales']}
                 />
-                <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={24} isAnimationActive={false}>
+                <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={24}>
                   {(dashboardData?.total_sales_per_category || []).map((_: any, index: number) => (
-                    <Cell key={`cell-cat-bar-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-cat-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
+                  <LabelList dataKey="value" position="right" formatter={(val: any) => `Rs.${Number(val).toLocaleString()}`} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-8 flex flex-wrap gap-3 justify-center">
-            {(dashboardData?.total_sales_per_category || []).map((item: any, index: number) => (
-              <div key={item.product__category__name} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50/80 border border-slate-100 shadow-sm">
-                <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                <span className="text-[10px] font-black uppercase text-slate-500 whitespace-nowrap">{item.product__category__name}</span>
-                <span className="text-[10px] font-black text-slate-900 border-l border-slate-200 pl-2 ml-1">{Number(item.category_percent || 0).toFixed(1)}%</span>
-              </div>
-            ))}
-          </div>
         </div>
 
-        {/* Sales by Kitchen Type */}
-        <div className="card-elevated p-8">
-          <div className="mb-6 text-center">
-            <h3 className="text-lg font-black uppercase tracking-tight">Sales by Kitchen Type (All Time)</h3>
-            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Kitchen split</p>
-          </div>
-          <div className="h-[250px] w-full">
+        {/* Kitchen distribution pie chart */}
+        <div className="card-elevated p-8 text-center">
+          <h3 className="text-lg font-black uppercase tracking-tight mb-6 capitalize">{timeframe} Kitchen Mix</h3>
+          <div className="h-[280px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={(dashboardData?.sales_by_kitchen_type || []).map((p: any) => ({
-                    ...p,
-                    total_amount: parseFloat(String(p.total_amount || 0)) || 0
+                  data={(dashboardData?.sales_by_kitchen_type || []).map((item: any) => ({
+                    name: (item.product__category__kitchentype__name || 'Other').toLowerCase(),
+                    value: parseFloat(String(item.total_amount || 0)) || 0
                   }))}
-                  dataKey="total_amount"
-                  nameKey="product__category__kitchentype__name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={90}
+                  dataKey="value"
+                  innerRadius={50}
+                  outerRadius={70}
                   paddingAngle={5}
                   stroke="none"
-                  isAnimationActive={false}
                 >
                   {(dashboardData?.sales_by_kitchen_type || []).map((_: any, index: number) => (
                     <Cell key={`cell-kt-${index}`} fill={PAYMENT_COLORS[index % PAYMENT_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '12px',
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                  }}
-                  formatter={(value: any) => [`Rs.${Number(value).toLocaleString()}`, 'Total']}
+                <Tooltip formatter={(value: any) => [`Rs.${Number(value).toLocaleString()}`, 'Total']} />
+                <Legend
+                  layout="vertical"
+                  align="right"
+                  verticalAlign="middle"
+                  formatter={(value, entry: any) => (
+                    <span className="text-[10px] font-black uppercase text-slate-500 ml-2">
+                      {value}: <span className="text-slate-900 font-black">Rs.{Number(entry.payload.value).toLocaleString()}</span>
+                    </span>
+                  )}
                 />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-8 space-y-2">
-            {(dashboardData?.sales_by_kitchen_type || []).map((item: any, index: number) => (
-              <div key={item.product__category__kitchentype__name} className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50/50 border border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: PAYMENT_COLORS[index % PAYMENT_COLORS.length] }}
-                  />
-                  <span className="text-[10px] font-black uppercase text-slate-500">{item.product__category__kitchentype__name || 'Other'}</span>
-                </div>
-                <span className="text-xs font-black text-slate-900">Rs.{Number(item.total_amount).toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
         </div>
 
-        {/* Payment Method Breakdown */}
-        <div className="card-elevated p-8">
-          <div className="mb-6 text-center">
-            <h3 className="text-lg font-black uppercase tracking-tight">Payment Methods (All Time)</h3>
-            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Transaction spread</p>
-          </div>
-          <div className="h-[250px] w-full">
+        {/* Payment Methods pie chart */}
+        <div className="card-elevated p-8 text-center">
+          <h3 className="text-lg font-black uppercase tracking-tight mb-6 capitalize">{timeframe} Payments</h3>
+          <div className="h-[280px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={(dashboardData?.sales_by_payment_method || []).map((p: any) => ({
-                    ...p,
-                    total_amount: parseFloat(String(p.total_amount || 0)) || 0
+                    name: (p.payment_method || 'other').toLowerCase(),
+                    value: parseFloat(String(p.total_amount || 0)) || 0
                   }))}
-                  dataKey="total_amount"
-                  nameKey="payment_method"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={90}
+                  dataKey="value"
+                  innerRadius={50}
+                  outerRadius={70}
                   paddingAngle={5}
                   stroke="none"
-                  isAnimationActive={false}
                 >
                   {(dashboardData?.sales_by_payment_method || []).map((_: any, index: number) => (
-                    <Cell key={`cell-payment-${index}`} fill={PAYMENT_COLORS[index % PAYMENT_COLORS.length]} />
+                    <Cell key={`cell-pay-${index}`} fill={PAYMENT_COLORS[index % PAYMENT_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '12px',
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                  }}
-                  formatter={(value: any) => [`Rs.${Number(value).toLocaleString()}`, 'Total']}
+                <Tooltip formatter={(value: any) => [`Rs.${Number(value).toLocaleString()}`, 'Total']} />
+                <Legend
+                  layout="vertical"
+                  align="right"
+                  verticalAlign="middle"
+                  formatter={(value, entry: any) => (
+                    <span className="text-[10px] font-black uppercase text-slate-500 ml-2">
+                      {value}: <span className="text-slate-900 font-black">Rs.{Number(entry.payload.value).toLocaleString()}</span>
+                    </span>
+                  )}
                 />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-8 space-y-2">
-            {(dashboardData?.sales_by_payment_method || []).slice(0, 3).map((item: any, index: number) => (
-              <div key={item.payment_method} className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50/50 border border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: PAYMENT_COLORS[index % PAYMENT_COLORS.length] }}
-                  />
-                  <span className="text-[10px] font-black uppercase text-slate-500">{item.payment_method?.toLowerCase()}</span>
-                </div>
-                <span className="text-xs font-black text-slate-900">Rs.{Number(item.total_amount).toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
-      {/* Hourly Trend Row */}
-      <div className="card-elevated p-6 relative overflow-hidden">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-semibold">Today's Sales Trend (Hourly)</h3>
-            <p className="text-xs text-muted-foreground">Hourly performance (8 AM - 8 PM)</p>
-          </div>
+      {/* Main trend chart */}
+      <div className="card-elevated p-8">
+        <h3 className="text-xl font-bold tracking-tight mb-8 capitalize">{timeframe} Sales Trend</h3>
+        <div className="h-[350px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={dashboardData?.trend_chart || []}>
+              <defs>
+                <linearGradient id="colorSalesTrend" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="label" fontSize={11} fontWeight={700} axisLine={false} tickLine={false} dy={10} />
+              <YAxis fontSize={11} fontWeight={700} axisLine={false} tickLine={false} tickFormatter={(v) => `Rs.${v}`} />
+              <Tooltip formatter={(v: any) => [`Rs.${Number(v).toLocaleString()}`, 'Sales']} />
+              <Area
+                type="monotone"
+                dataKey="sales"
+                stroke="hsl(var(--primary))"
+                strokeWidth={4}
+                fill="url(#colorSalesTrend)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={hourlyChartData}>
-            <defs>
-              <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-            <XAxis
-              dataKey="hour"
-              stroke="hsl(var(--muted-foreground))"
-              fontSize={11}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              stroke="hsl(var(--muted-foreground))"
-              fontSize={12}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(value) => `Rs.${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: '12px',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-              }}
-              formatter={(value: number) => [`Rs.${value.toLocaleString()}`, 'Sales']}
-            />
-            <Area
-              type="monotone"
-              dataKey="sales"
-              stroke="hsl(var(--primary))"
-              strokeWidth={3}
-              fillOpacity={1}
-              fill="url(#colorSales)"
-              dot={{ r: 4, strokeWidth: 2, fill: 'hsl(var(--card))' }}
-              activeDot={{ r: 6, strokeWidth: 0 }}
-              isAnimationActive={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
       </div>
 
-      {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Floors in current branch */}
-        <div className="card-elevated p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Floors</h3>
-            <div className="flex items-center gap-2">
-              <NavLink
-                to="/admin/dashboard/tables"
-                className="p-1.5 hover:bg-primary/10 rounded-md text-primary transition-colors"
-                title="Go to Table Management"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </NavLink>
-              <Layers className="h-5 w-5 text-primary" />
-            </div>
+        {/* Recent Activity Table */}
+        <div className="card-elevated overflow-hidden border-2 border-slate-50">
+          <div className="p-6 border-b flex items-center justify-between">
+            <h3 className="font-black text-slate-900 uppercase tracking-tighter text-sm">Recent Activity</h3>
+            <NavLink to="/admin/dashboard/invoices" className="text-[10px] font-black uppercase text-primary">View All</NavLink>
           </div>
-          <p className="text-xs text-muted-foreground mb-4">Floors in this branch</p>
-          {floors.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">No floors configured. Add floors in Table Management.</p>
-          ) : (
-            <div className="space-y-2">
-              {floors.map((floor: any) => (
-                <div
-                  key={floor.id}
-                  className="flex items-center justify-between py-3 px-4 rounded-xl bg-muted/50 border border-border hover:bg-muted/70 transition-colors"
-                >
-                  <span className="font-medium text-foreground">{floor.name || `Floor #${floor.id}`}</span>
-                  <span className="text-sm text-muted-foreground">
-                    {floor.table_count ?? 0} table{(floor.table_count ?? 0) !== 1 ? "s" : ""}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Top Selling Items */}
-        <div className="card-elevated p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Top Selling Items</h3>
-            <Coffee className="h-5 w-5 text-primary" />
-          </div>
-          <div className="space-y-3">
-            {(dashboardData?.top_selling_items || []).map((item: any, index: number) => (
-              <div key={item.product__name} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">
-                    {index + 1}
-                  </span>
-                  <div>
-                    <p className="font-medium">{item.product__name}</p>
-                    <p className="text-xs text-muted-foreground">{item.total_orders} orders</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Orders */}
-      <div className="card-elevated p-0 overflow-hidden">
-        <div className="p-6 border-b border-border">
-          <h3 className="text-lg font-semibold">Recent Orders</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted/40 text-muted-foreground uppercase text-xs font-semibold">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50/50">
               <tr>
-                <th className="px-6 py-4">Order ID</th>
-                <th className="px-6 py-4">Table</th>
-                <th className="px-6 py-4">Items</th>
-                <th className="px-6 py-4">Server</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Amount</th>
+                <th className="px-6 py-4 text-left font-black text-[10px] uppercase text-slate-400">Order</th>
+                <th className="px-6 py-4 text-left font-black text-[10px] uppercase text-slate-400">Time</th>
+                <th className="px-6 py-4 text-left font-black text-[10px] uppercase text-slate-400">Status</th>
+                <th className="px-6 py-4 text-right font-black text-[10px] uppercase text-slate-400">Total</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <Loader2 className="h-6 w-6 text-primary animate-spin" />
-                      <p className="text-muted-foreground text-xs">Syncing recent sales...</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : recentOrders.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">
-                    No recent orders found.
-                  </td>
-                </tr>
-              ) : recentOrders.map((order) => (
+            <tbody>
+              {recentOrders.map((order) => (
                 <tr
                   key={order.id}
-                  className="hover:bg-muted/30 transition-colors text-xs md:text-sm cursor-pointer"
+                  className="border-t border-slate-50 hover:bg-slate-50/50 cursor-pointer"
                   onClick={() => setSelectedOrder(order)}
                 >
-                  <td className="px-6 py-4 font-bold text-foreground">
-                    {order.invoice_number}
+                  <td className="px-6 py-4 font-bold text-slate-900">{order.invoice_number}</td>
+                  <td className="px-6 py-4 text-slate-500 text-xs">
+                    {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="font-medium text-[10px] uppercase text-muted-foreground">{order.branch_name}</span>
-                      <span className="text-xs">{order.description || order.invoice_description || 'General Sale'}</span>
-                    </div>
+                    <StatusBadge status={(order.payment_status || "PENDING").toLowerCase()} className="h-6 px-2 text-[9px]" />
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-primary">
-                      {order.items?.reduce((acc: number, item: any) => acc + (parseFloat(item.quantity) || 0), 0) || 0} items
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-muted-foreground">
-                    {order.created_by_name}
-                  </td>
-                  <td className="px-6 py-4">
-                    <StatusBadge status={(order.payment_status || "PENDING").toLowerCase()} className="shadow-none border h-6 px-2.5" />
-                  </td>
-                  <td className="px-6 py-4 text-right font-black text-primary">
-                    Rs.{order.total_amount}
-                  </td>
+                  <td className="px-6 py-4 text-right font-black text-primary">Rs.{order.total_amount}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* Order Detail Modal */}
-        <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Invoice {selectedOrder?.invoice_number}</DialogTitle>
-            </DialogHeader>
+        {/* Top Products / Branches */}
+        <div className="card-elevated p-6">
+          <h3 className="font-black text-slate-900 uppercase tracking-tighter text-sm mb-6">
+            {isGlobalView ? "Top Branches" : "Top Products"}
+          </h3>
+          <div className="space-y-4">
+            {isGlobalView ? (
+              (dashboardData?.top_perfomance_branch || []).map((branch: any, idx: number) => (
+                <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50/30 border border-slate-100">
+                  <span className="font-black text-slate-900">{branch.name}</span>
+                  <span className="font-black text-primary text-sm">Rs.{Number(branch.total_sales_per_branch).toLocaleString()}</span>
+                </div>
+              ))
+            ) : (
+              (dashboardData?.top_selling_items || []).slice(0, 5).map((item: any, idx: number) => (
+                <div key={idx} className="flex items-center justify-between">
+                  <span className="font-bold text-slate-700">{item.product__name}</span>
+                  <span className="text-xs font-black bg-slate-50 px-3 py-1 rounded-full text-slate-500">{item.total_orders} Sold</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
 
-            {selectedOrder && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
+      {/* Invoice Detail Dialog */}
+      <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
+        <DialogContent className="max-w-md rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
+          {selectedOrder && (
+            <div className="flex flex-col">
+              <div className="bg-primary/5 p-8 text-center border-b font-black">
+                <h2 className="text-2xl text-slate-900">Order {selectedOrder.invoice_number}</h2>
+              </div>
+              <div className="p-8 space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-xs font-bold uppercase tracking-widest text-slate-400">
                   <div>
-                    <p className="text-muted-foreground font-bold text-[10px] uppercase">Branch</p>
-                    <p className="font-medium">{selectedOrder.branch_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground font-bold text-[10px] uppercase">Created By</p>
-                    <p className="font-medium">{selectedOrder.created_by_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground font-bold text-[10px] uppercase">Date/Time</p>
-                    <p className="font-medium">{selectedOrder.created_at}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground font-bold text-[10px] uppercase">Payment Status</p>
+                    <p>Status</p>
                     <StatusBadge status={selectedOrder.payment_status.toLowerCase()} />
                   </div>
-                </div>
-
-                {selectedOrder.description && (
-                  <div className="bg-muted/30 p-2 rounded text-xs italic">
-                    <p className="text-muted-foreground font-bold text-[9px] uppercase mb-1">Description</p>
-                    {selectedOrder.description}
-                  </div>
-                )}
-
-                <div className="border-t pt-4">
-                  <p className="text-xs font-bold uppercase text-muted-foreground mb-2 tracking-widest">Items</p>
-                  <div className="space-y-2">
-                    {selectedOrder.items?.map((item: any, idx: number) => (
-                      <div key={idx} className="flex justify-between text-sm">
-                        <div className="flex flex-col text-left">
-                          <span className="font-medium">{item.quantity}× {item.product_name}</span>
-                        </div>
-                        <span className="font-medium">Rs.{(parseFloat(item.unit_price) * item.quantity).toFixed(2)}</span>
-                      </div>
-                    ))}
-                    {(!selectedOrder.items || selectedOrder.items.length === 0) && (
-                      <p className="text-xs text-muted-foreground italic">No items recorded</p>
-                    )}
+                  <div className="text-right">
+                    <p>Time</p>
+                    <p className="text-slate-900">{new Date(selectedOrder.created_at).toLocaleString()}</p>
                   </div>
                 </div>
-
-                <div className="border-t pt-4 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span>Rs.{selectedOrder.subtotal}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Tax</span>
-                    <span>Rs.{selectedOrder.tax_amount}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Discount</span>
-                    <span>-Rs.{selectedOrder.discount}</span>
-                  </div>
-                  <div className="border-t mt-2 pt-2 flex justify-between">
-                    <span className="font-bold">Total</span>
-                    <span className="text-xl font-black text-primary">Rs.{selectedOrder.total_amount}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-medium text-success">
-                    <span>Paid Amount</span>
-                    <span>Rs.{selectedOrder.paid_amount}</span>
+                <div className="bg-slate-50 rounded-2xl p-4">
+                  <div className="border-t border-slate-200 mt-2 pt-2 flex justify-between">
+                    <span className="font-black text-slate-900 uppercase text-xs">Total</span>
+                    <span className="text-xl font-black text-primary">Rs.{selectedOrder.total_amount?.toLocaleString()}</span>
                   </div>
                 </div>
+                <Button className="w-full h-12 rounded-2xl font-bold" onClick={() => setSelectedOrder(null)}>Close</Button>
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

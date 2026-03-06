@@ -52,6 +52,7 @@ import { useState, useEffect } from "react";
 
 const roleRedirectPath = (role?: string) => {
   switch (role) {
+    case "SUPER_ADMIN":
     case "ADMIN":
       return "/super-admin/dashboard";
     case "BRANCH_MANAGER":
@@ -140,7 +141,7 @@ const App = () => {
             {/* ✅ SUPER ADMIN PROTECTED */}
             <Route
               element={
-                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <ProtectedRoute allowedRoles={["ADMIN", "SUPER_ADMIN"]}>
                   <SuperAdminLayout />
                 </ProtectedRoute>
               }
@@ -225,7 +226,7 @@ const App = () => {
             <Route
               path="/admin/dashboard"
               element={
-                <ProtectedRoute allowedRoles={["BRANCH_MANAGER", "ADMIN"]}>
+                <ProtectedRoute allowedRoles={["BRANCH_MANAGER", "ADMIN", "SUPER_ADMIN"]}>
                   <AdminLayout />
                 </ProtectedRoute>
               }
