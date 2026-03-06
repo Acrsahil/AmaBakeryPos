@@ -2,7 +2,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
-from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, Sum, Value
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, Q, Sum, Value
 from django.db.models.functions import (
     Coalesce,
     ExtractHour,
@@ -18,6 +18,51 @@ from rest_framework.views import APIView
 
 from ..models import Branch, Invoice, InvoiceItem, User, Payment
 from ..serializer_dir.invoice_serializer import InvoiceResponseSerializer
+
+
+def get_date_range(request):
+    """Parses timeframe and custom dates from request query params."""
+    # Default to current month if no request
+    today = timezone.localdate()
+    if not request:
+        return today.replace(day=1), today, "monthly"
+
+    # Support both DRF request (query_params) and standard Django request (GET)
+    query_params = getattr(request, "query_params", request.GET)
+    timeframe = query_params.get("timeframe", "weekly")
+    start_date_str = query_params.get("start_date")
+    end_date_str = query_params.get("end_date")
+
+    if start_date_str and end_date_str:
+        try:
+            # Try parsing ISO format (YYYY-MM-DD)
+            start_date = date.fromisoformat(start_date_str)
+            end_date = date.fromisoformat(end_date_str)
+            return start_date, end_date, "custom"
+        except ValueError:
+            try:
+                # Fallback to datetime format
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+                return start_date, end_date, "custom"
+            except ValueError:
+                pass
+
+    if timeframe == "daily":
+        return today, today, "daily"
+    elif timeframe == "weekly":
+        start_of_week = today - timedelta(days=today.weekday())
+        return start_of_week, today, "weekly"
+    elif timeframe == "monthly":
+        start_of_month = today.replace(day=1)
+        return start_of_month, today, "monthly"
+    elif timeframe == "yearly":
+        start_of_year = today.replace(month=1, day=1)
+        return start_of_year, today, "yearly"
+
+    # Default to current week
+    start_of_week = today - timedelta(days=today.weekday())
+    return start_of_week, today, "weekly"
 
 
 class DashboardViewClass(APIView):
@@ -37,6 +82,8 @@ class DashboardViewClass(APIView):
 
     def get(self, request, branch_id=None):
         role = self.get_user_role(request.user)
+        # For global overview, we want no branch filter even if the user is assigned one,
+        # unless a specific branch_id is requested.
         my_branch = getattr(request.user, "branch", None)
 
         if role not in ["SUPER_ADMIN", "ADMIN", "BRANCH_MANAGER"]:
@@ -45,565 +92,210 @@ class DashboardViewClass(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Handle SUPER_ADMIN and ADMIN cases
-        if role in ["SUPER_ADMIN", "ADMIN"]:
-            if not branch_id:
-                # Global summary for network overview
-                total_sum = (
-                    Invoice.objects.aggregate(total=Sum("total_amount"))["total"] or 0
-                )
-                total_count_branch = Branch.objects.all().count()
-                total_count_order = Invoice.objects.all().count()
-                total_user_count = User.objects.all().count()
-                average = float(total_sum) / total_count_order if total_count_order else 0
+        target_branch = None
+        if branch_id:
+            try:
+                target_branch = Branch.objects.get(id=branch_id)
+            except Branch.DoesNotExist:
+                return Response({"success": False, "message": "Branch not found"}, status=status.HTTP_404_NOT_FOUND)
+        elif role in ["BRANCH_MANAGER"] and my_branch:
+            target_branch = my_branch
 
-                today = timezone.now().date()
+        # Get base report data from the generalized function
+        report_data = report_dashboard(target_branch, request)
+        start_date = report_data["start_date"]
+        end_date = report_data["end_date"]
 
-                start_of_week = today - timedelta(days=today.weekday())  # Monday
-                print("st_week->>", start_of_week)
+        # Base filter for extra aggregations
+        base_filter = {"created_at__date__gte": start_date, "created_at__date__lte": end_date}
+        if target_branch:
+            base_filter["branch"] = target_branch
 
-                end_of_week = start_of_week + timedelta(days=6)
+        # Common extra dashboard data
+        recent_orders_objs = (
+            Invoice.objects.filter(**base_filter)
+            .select_related("branch", "created_by")
+            .prefetch_related("bills", "bills__product", "payments")
+            .order_by("-created_at")[:5]
+        )
+        recent_orders = InvoiceResponseSerializer(recent_orders_objs, many=True).data
 
-                current_week_data = (
-                    Invoice.objects.filter(
-                        created_at__date__gte=start_of_week,
-                        created_at__date__lte=end_of_week,
-                    )
-                    .annotate(
-                        year=ExtractYear("created_at"),
-                        week=ExtractWeek("created_at"),
-                        weekday=ExtractWeekDay(
-                            "created_at"
-                        ),  # 1=Sunday, 2=Monday, ..., 7=Saturday
-                    )
-                    .values("year", "week", "weekday")
-                    .annotate(
-                        total_sales=Sum("total_amount"),
-                    )
-                    .order_by("year", "week", "weekday")
-                )
-
-                days = {
-                    "monday": 0,
-                    "tuesday": 0,
-                    "wednesday": 0,
-                    "thursday": 0,
-                    "friday": 0,
-                    "saturday": 0,
-                    "sunday": 0,
-                }
-                print("Current Week Data:")
-
-                for item in current_week_data:
-                    print(item)
-                    if item["weekday"] == 2:
-                        days["monday"] = item["total_sales"]
-                    elif item["weekday"] == 3:
-                        days["tuesday"] = item["total_sales"]
-                    elif item["weekday"] == 4:
-                        days["wednesday"] = item["total_sales"]
-                    elif item["weekday"] == 5:
-                        days["thursday"] = item["total_sales"]
-                    elif item["weekday"] == 6:
-                        days["friday"] = item["total_sales"]
-                    elif item["weekday"] == 7:
-                        days["saturday"] = item["total_sales"]
-                    elif item["weekday"] == 1:
-                        days["sunday"] = item["total_sales"]
-
-                # sales by category pie chart percentage
-                if total_sum > 0:
-                    sales_per_category = (
-                        InvoiceItem.objects.values("product__category__name")
-                        .annotate(
-                            category_total_sales=Coalesce(Sum(
-                                ExpressionWrapper(
-                                    F("quantity") * F("unit_price")
-                                    - F("discount_amount"),
-                                    output_field=DecimalField(
-                                        max_digits=12, decimal_places=2
-                                    ),
-                                )
-                            ), Value(0.0, output_field=DecimalField()))
-                        )
-                        .annotate(
-                            category_percent=Coalesce(ExpressionWrapper(
-                                (F("category_total_sales") * 100.0) / Value(total_sum),
-                                output_field=DecimalField(
-                                    max_digits=10, decimal_places=2
-                                ),
-                            ), Value(0.0, output_field=DecimalField()))
-                        )
-                    )
-                else:
-                    sales_per_category = []
-
-                # branch performance
-                top_performance_branch = (
-                    Branch.objects.values("name")
-                    .annotate(total_sales_per_branch=Coalesce(Sum("invoices__total_amount"), Value(0.0, output_field=DecimalField())))
-                    .order_by("-total_sales_per_branch")[:5]
-                )
-
-                # best selling items
-                top_sold_items = (
-                    InvoiceItem.objects.values("product__name")
-                    .annotate(total_sold_units=Sum("quantity"))
-                    .order_by("-total_sold_units")[:5]
-                )
-
-                # sales by payment method - FIXED: Added this back
-                sales_by_payment_method = (
-                    Payment.objects.values("payment_method")
-                    .annotate(total_amount=Sum("amount"))
-                    .order_by("-total_amount")
-                )
-
-                # sales by kitchen type
-                sales_by_kitchen_type = (
-                    InvoiceItem.objects.values("product__category__kitchentype__name")
-                    .annotate(total_amount=Coalesce(Sum(
-                        ExpressionWrapper(
-                            F("quantity") * F("unit_price") - F("discount_amount"),
-                            output_field=DecimalField(max_digits=12, decimal_places=2),
-                        )
-                    ), Value(0.0, output_field=DecimalField())))
-                    .order_by("-total_amount")
-                )
-
-                # recent orders across all branches
-                recent_orders_objs = (
-                    Invoice.objects.select_related("branch", "created_by")
-                    .prefetch_related("bills", "bills__product", "payments")
-                    .order_by("-created_at")[:5]
-                )
-                recent_orders = InvoiceResponseSerializer(recent_orders_objs, many=True).data
-
-                return Response(
-                    {
-                        "success": True,
-                        "total_sales": total_sum,
-                        "total_branch": total_count_branch,
-                        "total_user": total_user_count - 1,
-                        "total_count_order": total_count_order,
-                        "average_order_value": average,
-                        "total_sales_per_category": sales_per_category,
-                        "Weekely_Sales": days,
-                        "top_perfomance_branch": top_performance_branch,
-                        "top_selling_items": top_sold_items,
-                        "sales_by_payment_method": sales_by_payment_method,
-                        "sales_by_kitchen_type": sales_by_kitchen_type,
-                        "recent_orders": recent_orders,
-                    },
-                    status=status.HTTP_200_OK,
-                )
-            else:
-                # Admin with specific branch_id
-                my_branch = branch_id
-
-        # Handle branch-specific dashboard (for BRANCH_MANAGER or ADMIN with branch_id)
-        if my_branch:
-            # 1.today's total sales amount
-            today_invoices = self.date_filter(my_branch, self.todaydate, self.todaydate)
-            yesterday_invoices = self.date_filter(
-                my_branch, self.yesterdaydate, self.yesterdaydate
-            )
-
-            yesterday_sales = 0
-            today_sales = 0
-            for invoice in today_invoices:
-                print(invoice.created_at)
-                print("Raw data time format ->>", invoice.created_at)
-                today_sales += invoice.total_amount
-
-            for invoice in yesterday_invoices:
-                yesterday_sales += invoice.total_amount
-
-            if yesterday_sales == 0:
-                sales_percent = today_sales - yesterday_sales
-            else:
-                sales_percent = (
-                    (today_sales - yesterday_sales) / yesterday_sales
-                ) * 100
-
-            # 2.today's total orders
-            today_total_orders = today_invoices.count()
-            yesterday_orders = yesterday_invoices.count()
-
-            # 2.calculating order percent
-            if yesterday_orders == 0:
-                order_percent = float(today_total_orders - yesterday_orders)
-            else:
-                order_percent = (
-                    (today_total_orders - yesterday_orders) / yesterday_orders
-                ) * 100
-
-            # 3. avg order value
-            if today_total_orders == 0:
-                today_avg_order = 0
-            else:
-                today_avg_order = Decimal(str((today_sales) / today_total_orders))
-
-            if yesterday_orders == 0:
-                yesterday_avg_order = 0
-            else:
-                yesterday_avg_order = Decimal(str((yesterday_sales) / yesterday_orders))
-
-            if yesterday_avg_order == 0:
-                avg_order_percent = (today_avg_order) - (yesterday_avg_order)
-            else:
-                avg_order_percent = (
-                    (today_avg_order - yesterday_avg_order) / yesterday_avg_order
-                ) * 100
-
-            hourly_orders = (
-                self.date_filter(my_branch, self.todaydate, self.todaydate)
-                .annotate(hour=TruncHour("created_at"))
-                .values("hour")
-                .annotate(total_orders=Count("id"))
-            )
-
-            max_orders = hourly_orders.aggregate(max_orders=Max("total_orders"))[
-                "max_orders"
-            ]
-            if max_orders is not None:
-                peak_hours = hourly_orders.filter(total_orders=max_orders)
-                formatted_peak_hours = [
-                    h["hour"].strftime("%I:%M %p") for h in peak_hours
-                ]
-            else:
-                formatted_peak_hours = []
-
-            print("Max Orders-> ", max_orders)
-
-            # 5.sales by category piechart
-            # Define branch total sum for percentage calculation
-            branch_total_sum = (
-                Invoice.objects.filter(branch=my_branch).aggregate(total=Sum("total_amount"))["total"] or 0
-            )
-
-
-            total_sales_per_category = (
-                InvoiceItem.objects.filter(invoice__branch=my_branch)
-                .values("product__category__name")
-                .annotate(
-                    category_total_sales=Coalesce(Sum(
-                        ExpressionWrapper(
-                            F("quantity") * F("unit_price") - F("discount_amount"),
-                            output_field=DecimalField(max_digits=10, decimal_places=2),
-                        )
-                    ), Value(0.0, output_field=DecimalField()))
-                )
-            )
-
-            if branch_total_sum > 0:
-                total_sales_per_category = total_sales_per_category.annotate(
-                    category_percent=ExpressionWrapper(
-                        (F("category_total_sales") * 100.0) / Value(branch_total_sum),
-                        output_field=DecimalField(max_digits=10, decimal_places=2),
-                    )
-                )
-            
-            total_sales_per_category = total_sales_per_category.order_by("-category_total_sales")[:5]
-
-            # 6. top selling items
-            top_selling_items = (
-                InvoiceItem.objects.filter(invoice__branch=my_branch)
-                .values("product__name")
-                .annotate(total_orders=Sum("quantity"))
-                .order_by("-total_orders")[:5]
-            )
-
-            # 6.5 sales by payment method
-            sales_by_payment_method = (
-                Payment.objects.filter(invoice__branch=my_branch)
-                .values("payment_method")
-                .annotate(total_amount=Sum("amount"))
-                .order_by("-total_amount")
-            )
-
-            # sales by kitchen type
-            sales_by_kitchen_type = (
-                InvoiceItem.objects.filter(invoice__branch=my_branch)
-                .values("product__category__kitchentype__name")
-                .annotate(total_amount=Coalesce(Sum(
-                    ExpressionWrapper(
-                        F("quantity") * F("unit_price") - F("discount_amount"),
-                        output_field=DecimalField(max_digits=12, decimal_places=2),
-                    )
-                ), Value(0.0, output_field=DecimalField())))
-                .order_by("-total_amount")
-            )
-
-            # Recent orders for this branch
-            recent_orders_objs = (
-                Invoice.objects.filter(branch=my_branch)
-                .select_related("branch", "created_by")
-                .prefetch_related("bills", "bills__product", "payments")
-                .order_by("-created_at")[:5]
-            )
-            recent_orders = InvoiceResponseSerializer(recent_orders_objs, many=True).data
-
-            # 7. current week sales (Mon–Sun) for the Weekly Sales chart
-            today = timezone.now().date()
-            start_of_week = today - timedelta(days=today.weekday())  # Monday
-            end_of_week = start_of_week + timedelta(days=6)
-
-            branch_week_data = (
-                Invoice.objects.filter(
-                    branch=my_branch,
-                    created_at__date__gte=start_of_week,
-                    created_at__date__lte=end_of_week,
-                )
-                .annotate(
-                    year=ExtractYear("created_at"),
-                    week=ExtractWeek("created_at"),
-                    weekday=ExtractWeekDay("created_at"),  # 1=Sun, 2=Mon, ..., 7=Sat
-                )
-                .values("year", "week", "weekday")
-                .annotate(total_sales=Sum("total_amount"))
-                .order_by("year", "week", "weekday")
-            )
-
-            branch_days = {
-                "monday": 0,
-                "tuesday": 0,
-                "wednesday": 0,
-                "thursday": 0,
-                "friday": 0,
-                "saturday": 0,
-                "sunday": 0,
-            }
-            for item in branch_week_data:
-                if item["weekday"] == 2:
-                    branch_days["monday"] = item["total_sales"]
-                elif item["weekday"] == 3:
-                    branch_days["tuesday"] = item["total_sales"]
-                elif item["weekday"] == 4:
-                    branch_days["wednesday"] = item["total_sales"]
-                elif item["weekday"] == 5:
-                    branch_days["thursday"] = item["total_sales"]
-                elif item["weekday"] == 6:
-                    branch_days["friday"] = item["total_sales"]
-                elif item["weekday"] == 7:
-                    branch_days["saturday"] = item["total_sales"]
-                elif item["weekday"] == 1:
-                    branch_days["sunday"] = item["total_sales"]
-
-            # 8. Hourly sales for today (8am to 8pm) - Branch specific
-            hourly_data_branch = (
-                Invoice.objects.filter(
-                    branch=my_branch,
-                    created_at__date=today,
-                )
-                .annotate(hour=ExtractHour("created_at"))
-                .values("hour")
-                .annotate(total_sales=Sum("total_amount"))
-            )
-
-            hourly_sales_branch = []
-            for h in range(8, 21):
-                label = f"{h if h <= 12 else h - 12} {'AM' if h < 12 else 'PM'}"
-                if h == 12:
-                    label = "12 PM"
-                sales_val = 0
-                for item in hourly_data_branch:
-                    if item["hour"] == h:
-                        sales_val = float(item["total_sales"] or 0)
-                        break
-                hourly_sales_branch.append({"hour": label, "sales": sales_val})
-
-            return Response(
-                {
-                    "success": True,
-                    "today_sales": today_sales,
-                    "sales_percent": sales_percent,
-                    "total_orders": today_total_orders,
-                    "order_percent": order_percent,
-                    "avg_orders": today_avg_order,
-                    "avg_order_percent": avg_order_percent,
-                    "peak_hours": formatted_peak_hours,
-                    "total_sales_per_category": total_sales_per_category,
-                    "top_selling_items": top_selling_items,
-                    "Weekely_Sales": branch_days,
-                    "Hourly_sales": hourly_sales_branch,
-                    "sales_by_payment_method": sales_by_payment_method,
-                    "sales_by_kitchen_type": sales_by_kitchen_type,
-                    "recent_orders": recent_orders,  # ADDED
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        # Fallback response if no branch is determined
-        return Response(
-            {"success": False, "message": "Unable to determine branch for dashboard"},
-            status=status.HTTP_400_BAD_REQUEST,
+        user_count = (
+            User.objects.filter(branch=target_branch).count() 
+            if target_branch else User.objects.all().count() - 1
         )
 
+        response_data = {
+            **report_data,
+            "recent_orders": recent_orders,
+            "total_sum": report_data["total_month_sales"],
+            "total_sales": report_data["total_month_sales"],
+            "total_count_order": report_data["total_month_orders"],
+            "total_orders": report_data["total_month_orders"],
+            "average_order_value": report_data["avg_order"],
+            "avg_orders": report_data["avg_order"],
+            "total_sales_per_category": report_data["sales_by_category"],
+            "sales_percent": report_data["growth_percent"],
+            "order_percent": report_data["growth_percent"],
+            "avg_order_percent": report_data["growth_percent"],
+            "total_user": user_count,
+            "total_user_count": user_count,
+            "total_branch": Branch.objects.all().count(),
+            "total_count_branch": Branch.objects.all().count(),
+        }
 
-def report_dashboard(my_branch):
-    current_month = timezone.localdate().month
-    current_year = timezone.localdate().year
+        if not target_branch:
+            # Add global-only fields
+            response_data.update({
+                "top_perfomance_branch": list(Branch.objects.annotate(
+                    total_sales_per_branch=Coalesce(
+                        Sum("invoices__total_amount", filter=Q(invoices__created_at__date__gte=start_date, invoices__created_at__date__lte=end_date)),
+                        Value(0.0, output_field=DecimalField())
+                    )
+                ).values("name", "total_sales_per_branch").order_by("-total_sales_per_branch")[:5]),
+                "top_selling_items": report_data["top_selling_items_count"],
+            })
+        else:
+            # Add branch-specific fields
+            response_data.update({
+                "today_sales": report_data["total_month_sales"],
+                "top_selling_items": report_data["top_selling_items_count"],
+            })
+            
+            # Peak hours for single day
+            if (end_date - start_date).days == 0:
+                hourly_orders = (
+                    Invoice.objects.filter(**base_filter)
+                    .annotate(hour=TruncHour("created_at"))
+                    .values("hour")
+                    .annotate(total_orders=Count("id"))
+                )
+                max_orders = hourly_orders.aggregate(max_orders=Max("total_orders"))["max_orders"]
+                if max_orders is not None:
+                    peak_hours = hourly_orders.filter(total_orders=max_orders)
+                    response_data["peak_hours"] = [h["hour"].strftime("%I:%M %p") for h in peak_hours]
 
-    last_month = timezone.localdate() - relativedelta(months=1)
-    current_month_sales = (
-        Invoice.objects.filter(
-            branch=my_branch,
-            created_at__year=current_year,
-            created_at__month=current_month,
-        ).aggregate(total_sales_amount=Sum("total_amount"))["total_sales_amount"]
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
+def report_dashboard(my_branch=None, request=None):
+    start_date, end_date, timeframe = get_date_range(request)
+
+    base_filter = {
+        "created_at__date__gte": start_date,
+        "created_at__date__lte": end_date,
+    }
+    if my_branch:
+        base_filter["branch"] = my_branch
+
+    current_sales = (
+        Invoice.objects.filter(**base_filter).aggregate(total_sales_amount=Sum("total_amount"))["total_sales_amount"]
         or 0
     )
 
     # total orders
-    total_orders = Invoice.objects.filter(
-        branch=my_branch,
-        created_at__year=current_year,
-        created_at__month=current_month,
-    )
+    current_orders_qs = Invoice.objects.filter(**base_filter)
+    current_orders_count = current_orders_qs.count()
 
     # average order
-    avg_order_month = current_month_sales / total_orders.count() if total_orders.count() > 0 else 0
+    avg_order = current_sales / current_orders_count if current_orders_count > 0 else 0
 
-    print("This is last month->", last_month.month)
+    # growth percent comparison (compare with previous period of same length)
+    period_length = (end_date - start_date).days + 1
+    prev_end_date = start_date - timedelta(days=1)
+    prev_start_date = prev_end_date - timedelta(days=period_length - 1)
 
-    # growth percent
-    last_month_sales = (
-        Invoice.objects.filter(
-            branch=my_branch, 
-            created_at__month=last_month.month,
-            created_at__year=last_month.year  # Added year filter for accuracy
-        ).aggregate(total_sales=Sum("total_amount"))["total_sales"]
+    prev_base_filter = {
+        "created_at__date__gte": prev_start_date,
+        "created_at__date__lte": prev_end_date,
+    }
+    if my_branch:
+        prev_base_filter["branch"] = my_branch
+
+    prev_period_sales = (
+        Invoice.objects.filter(**prev_base_filter).aggregate(total_sales=Sum("total_amount"))["total_sales"]
         or 0
     )
 
-    if last_month_sales == 0:
-        growth_percent = current_month_sales - last_month_sales
+    if prev_period_sales == 0:
+        growth_percent = current_sales - prev_period_sales
     else:
-        growth_percent = (
-            (current_month_sales - last_month_sales) / last_month_sales
-        ) * 100
+        growth_percent = ((current_sales - prev_period_sales) / prev_period_sales) * 100
 
-    today = timezone.now().date()
-
-    start_of_week = today - timedelta(days=today.weekday())  # Monday
-    end_of_week = start_of_week + timedelta(days=6)
-
-    # FIXED: Removed the annotate with year and week since we're not using them in values
-    current_week_data = (
-        Invoice.objects.filter(
-            branch=my_branch,
-            created_at__date__gte=start_of_week,
-            created_at__date__lte=end_of_week,
-        )
-        .annotate(
-            weekday=ExtractWeekDay("created_at"),  # 1=Sunday, 2=Monday, ..., 7=Saturday
-        )
-        .values("weekday")
-        .annotate(
-            total_sales=Sum("total_amount"),
-        )
-        .order_by("weekday")
+    # Trend Data
+    trend_data = (
+        Invoice.objects.filter(**base_filter)
     )
 
-    days = {
-        "monday": 0,
-        "tuesday": 0,
-        "wednesday": 0,
-        "thursday": 0,
-        "friday": 0,
-        "saturday": 0,
-        "sunday": 0,
-    }
+    # Weekly Sales (Specific format for frontend bars)
+    today = date.today() # Ensure 'today' is defined for this scope
+    start_of_current_week = today - timedelta(days=today.weekday())
+    weekly_qs = trend_data.filter(created_at__date__gte=start_of_current_week).annotate(label=ExtractWeekDay("created_at")).values("label").annotate(sales=Sum("total_amount"))
+    day_names_full = {1: "sunday", 2: "monday", 3: "tuesday", 4: "wednesday", 5: "thursday", 6: "friday", 7: "saturday"}
+    weekly_sales_dict = {name: 0.0 for name in day_names_full.values()}
+    for item in weekly_qs:
+        weekly_sales_dict[day_names_full[item["label"]]] = float(item["sales"])
 
-    for item in current_week_data:
-        print(item)
+    if timeframe == "daily" or period_length <= 1:
+        # Show hourly trend for single day or daily view
+        trend_qs = trend_data.annotate(label=ExtractHour("created_at")).values("label").annotate(sales=Sum("total_amount")).order_by("label")
+        trend_chart = []
+        for h in range(8, 21):
+            lbl = f"{h if h <= 12 else h - 12} {'AM' if h < 12 else 'PM'}"
+            val = next((item["sales"] for item in trend_qs if item["label"] == h), 0)
+            trend_chart.append({"label": lbl, "sales": float(val)})
+    elif timeframe == "weekly" or period_length <= 7:
+        # Show daily trend for the week
+        trend_qs = trend_data.annotate(label=ExtractWeekDay("created_at")).values("label").annotate(sales=Sum("total_amount")).order_by("label")
+        day_names = {1: "Sun", 2: "Mon", 3: "Tue", 4: "Wed", 5: "Thu", 6: "Fri", 7: "Sat"}
+        trend_chart = []
+        for d_idx in [2, 3, 4, 5, 6, 7, 1]:
+            val = next((item["sales"] for item in trend_qs if item["label"] == d_idx), 0)
+            trend_chart.append({"label": day_names[d_idx], "sales": float(val)})
+    else:
+        # Show daily trend for the month/range
+        trend_qs = trend_data.annotate(label=F("created_at__date")).values("label").annotate(sales=Sum("total_amount")).order_by("label")
+        trend_chart = [{"label": item["label"].strftime("%d %b"), "sales": float(item["sales"])} for item in trend_qs]
 
-        if item["weekday"] == 2:
-            days["monday"] = item["total_sales"]
-        elif item["weekday"] == 3:
-            days["tuesday"] = item["total_sales"]
-        elif item["weekday"] == 4:
-            days["wednesday"] = item["total_sales"]
-        elif item["weekday"] == 5:
-            days["thursday"] = item["total_sales"]
-        elif item["weekday"] == 6:
-            days["friday"] = item["total_sales"]
-        elif item["weekday"] == 7:
-            days["saturday"] = item["total_sales"]
-        elif item["weekday"] == 1:
-            days["sunday"] = item["total_sales"]
-
-    # Hourly sales for today (8am to 8pm)
-    hourly_data_raw = (
-        Invoice.objects.filter(
-            branch=my_branch,
-            created_at__date=today,
-        )
-        .annotate(hour=ExtractHour("created_at"))
-        .values("hour")
-        .annotate(total_sales=Sum("total_amount"))
-    )
-
-    # Initialize hours 8am to 8pm as a list for charts
-    hourly_sales_list = []
-    for h in range(8, 21):
-        label = f"{h if h <= 12 else h - 12} {'AM' if h < 12 else 'PM'}"
-        if h == 12:
-            label = "12 PM"
-
-        sales_val = 0
-        for item in hourly_data_raw:
-            if item["hour"] == h:
-                sales_val = float(item["total_sales"] or 0)
-                break
-        hourly_sales_list.append({"hour": label, "sales": sales_val})
-
-    top_selling_items_count = (
-        InvoiceItem.objects.filter(invoice__branch=my_branch)
-        .values("product__name")
-        .annotate(total_orders=Sum("quantity"))
-        .annotate(
-            total_sales=Sum(
-                ExpressionWrapper(
-                    F("quantity") * F("unit_price") - F("discount_amount"),
-                    output_field=DecimalField(max_digits=10, decimal_places=2),
-                )
-            )
-        )
-        .order_by("-total_orders")[:5]
-    )
-
-    sales_by_payment_method = (
-        Payment.objects.filter(invoice__branch=my_branch)
-        .values("payment_method")
-        .annotate(total_amount=Sum("amount"))
-        .order_by("-total_amount")
-    )
-
-    sales_by_kitchen_type = (
-        InvoiceItem.objects.filter(invoice__branch=my_branch)
-        .values("product__category__kitchentype__name")
-        .annotate(total_amount=Coalesce(Sum(
+    # Aggregate distribution data
+    def get_distribution(model, period_filter, values_field, annotate_field="total_amount"):
+        return list(model.objects.filter(**period_filter).values(values_field).annotate(**{annotate_field: Coalesce(Sum(
             ExpressionWrapper(
                 F("quantity") * F("unit_price") - F("discount_amount"),
                 output_field=DecimalField(max_digits=12, decimal_places=2),
-            )
-        ), Value(0.0, output_field=DecimalField())))
-        .order_by("-total_amount")
-    )
+            ) if model == InvoiceItem else F("amount"),
+            output_field=DecimalField()
+        ), Value(0.0, output_field=DecimalField()))}).order_by(f"-{annotate_field}"))
+
+    period_filter_ii = {"invoice__created_at__date__gte": start_date, "invoice__created_at__date__lte": end_date}
+    if my_branch:
+        period_filter_ii["invoice__branch"] = my_branch
+    
+    period_filter_p = {"invoice__created_at__date__gte": start_date, "invoice__created_at__date__lte": end_date}
+    if my_branch:
+        period_filter_p["invoice__branch"] = my_branch
+
+    sales_by_category = get_distribution(InvoiceItem, period_filter_ii, "product__category__name", "category_total_sales")
+    sales_by_kitchen = get_distribution(InvoiceItem, period_filter_ii, "product__category__kitchentype__name")
+    sales_by_payment = get_distribution(Payment, period_filter_p, "payment_method")
+
+    top_selling = list(InvoiceItem.objects.filter(**period_filter_ii).values("product__name").annotate(total_orders=Sum("quantity")).annotate(total_sales=Sum(ExpressionWrapper(F("quantity") * F("unit_price") - F("discount_amount"), output_field=DecimalField(max_digits=12, decimal_places=2)))).order_by("-total_orders")[:5])
 
     return {
         "success": True,
-        "total_month_sales": current_month_sales,
-        "total_month_orders": total_orders.count(),
-        "Weekly_sales": days,
-        "Hourly_sales": hourly_sales_list,
-        "avg_order_month": avg_order_month,
-        "top_selling_items_count": top_selling_items_count,
-        "growth_percent": growth_percent,
-        "sales_by_payment_method": sales_by_payment_method,
-        "sales_by_kitchen_type": sales_by_kitchen_type,
+        "total_month_sales": float(current_sales),
+        "total_month_orders": current_orders_count,
+        "avg_order": float(avg_order),
+        "growth_percent": float(growth_percent),
+        "trend_chart": trend_chart,
+        "Weekely_Sales": weekly_sales_dict,
+        "sales_by_category": sales_by_category,
+        "sales_by_kitchen_type": sales_by_kitchen,
+        "sales_by_payment_method": sales_by_payment,
+        "top_selling_items_count": top_selling,
+        "start_date": start_date,
+        "end_date": end_date,
+        "timeframe": timeframe,
     }
 
 
@@ -632,5 +324,5 @@ class ReportDashboardViewClass(APIView):
                 )
             my_branch = branch_id
 
-        data = report_dashboard(my_branch)
+        data = report_dashboard(my_branch, request)
         return Response({"success": True, **data}, status=status.HTTP_200_OK)
