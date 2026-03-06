@@ -70,6 +70,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop("items")
         paid_amount = validated_data.pop("paid_amount", Decimal("0.00"))
+        print("Yo customer le tireako amount ho hai sabina ji_>>> ",paid_amount)
         payment_method = validated_data.pop("payment_method", "CASH")
         request = self.context.get("request")
         notes = validated_data.get("notes", "")
@@ -99,7 +100,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 notes="Initial payment during invoice creation",
             )
             if role == "WAITER":
-                invoice.payment_status = "PARTIAL"
+                invoice.payment_status = "WAITER PAID"
                 invoice.received_by_waiter = user
             elif role in ["COUNTER", "BRANCH_MANAGER", "ADMIN", "SUPER_ADMIN"]:
                 invoice.received_by_counter = user
@@ -179,10 +180,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "SUPER_ADMIN",
         ]:
             invoice.payment_status = "PAID"
-        elif invoice.paid_amount > 0:
+        elif invoice.paid_amount > 0 and role != "WAITER":
             invoice.payment_status = "PARTIAL"
-        else:
+        elif invoice.paid_amount > 0:
             # This handles PAY LATER case (paid_amount = 0)
+            invoice.payment_status = "WAITER PAID"
+        else:
             invoice.payment_status = "PENDING"
 
         invoice.save()

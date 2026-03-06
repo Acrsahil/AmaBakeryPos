@@ -148,13 +148,20 @@ export default function PaymentCollection() {
       return;
     }
 
-    if (received < due) {
-      toast.error("Insufficient amount");
-      return;
+    // if (received < due) {
+    //   toast.error("Insufficient amount");
+    //   return;
+    // }
+
+
+
+    if (received >= due) {
+      const change = received - due;
+      processPayment('CASH', due, change);
+    } else {
+      processPayment('CASH', received, 0);
     }
 
-    const change = received - due;
-    processPayment('CASH', due, change);
   };
 
   return (
@@ -321,18 +328,32 @@ export default function PaymentCollection() {
                 </div>
               </div>
 
-              {cashReceived && parseFloat(cashReceived) >= parseFloat(selectedOrder?.due_amount || selectedOrder?.total_amount || 0) && (
-                <div className="p-4 rounded-xl bg-emerald-50 border-2 border-emerald-100 text-emerald-700 animate-in zoom-in-95 duration-300">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-widest font-black opacity-70 mb-0.5">Change to Return</p>
-                      <p className="text-3xl font-black">Rs.{(parseFloat(cashReceived) - parseFloat(selectedOrder?.due_amount || selectedOrder?.total_amount || 0)).toFixed(2)}</p>
-                    </div>
-                    <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center">
-                      <IndianRupee className="h-6 w-6" />
+              {cashReceived && parseFloat(cashReceived) > 0 && (
+                parseFloat(cashReceived) >= parseFloat(selectedOrder?.due_amount || selectedOrder?.total_amount || 0) ? (
+                  <div className="p-4 rounded-xl bg-emerald-50 border-2 border-emerald-100 text-emerald-700 animate-in zoom-in-95 duration-300">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest font-black opacity-70 mb-0.5">Change to Return</p>
+                        <p className="text-3xl font-black">Rs.{(parseFloat(cashReceived) - parseFloat(selectedOrder?.due_amount || selectedOrder?.total_amount || 0)).toFixed(2)}</p>
+                      </div>
+                      <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center">
+                        <IndianRupee className="h-6 w-6" />
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-amber-50 border-2 border-amber-100 text-amber-700 animate-in zoom-in-95 duration-300">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest font-black opacity-70 mb-0.5">Remaining Due</p>
+                        <p className="text-3xl font-black">Rs.{(parseFloat(selectedOrder?.due_amount || selectedOrder?.total_amount || 0) - parseFloat(cashReceived)).toFixed(2)}</p>
+                      </div>
+                      <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center">
+                        <Clock className="h-6 w-6" />
+                      </div>
+                    </div>
+                  </div>
+                )
               )}
             </div>
 
@@ -348,7 +369,7 @@ export default function PaymentCollection() {
               <Button
                 className="flex-[1.5] h-14 text-base font-black bg-emerald-600 hover:bg-emerald-700 shadow-lg rounded-xl"
                 onClick={handleCashPaymentSubmit}
-                disabled={isProcessing || !cashReceived || parseFloat(cashReceived) < parseFloat(selectedOrder?.due_amount || selectedOrder?.total_amount || 0)}
+                disabled={isProcessing || !cashReceived || isNaN(parseFloat(cashReceived)) || parseFloat(cashReceived) <= 0}
               >
                 {isProcessing ? (
                   <Loader2 className="h-6 w-6 animate-spin" />

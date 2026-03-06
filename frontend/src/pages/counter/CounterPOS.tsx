@@ -292,10 +292,10 @@ export default function CounterPOS() {
             toast.error("Please select payment method");
             return;
         }
-        if (paymentMethod === 'cash' && (!cashReceived || parseFloat(cashReceived) < total)) {
-            toast.error("Insufficient cash received");
-            return;
-        }
+        // if (paymentMethod === 'cash' && (!cashReceived || parseFloat(cashReceived) < total)) {
+        //     toast.error("Insufficient cash received");
+        //     return;
+        // }
 
         setIsProcessing(true);
         const user = getCurrentUser();
@@ -310,7 +310,7 @@ export default function CounterPOS() {
                 description: "Counter Sale",
                 tax_amount: taxAmount,
                 discount: 0,
-                paid_amount: total,
+                paid_amount: paymentMethod === 'cash' ? Math.min(total, parseFloat(cashReceived) || total) : total,
                 payment_method: paymentMethod === 'cash' ? "CASH" : "QR",
                 items: cart.map(c => ({
                     item_type: "PRODUCT",

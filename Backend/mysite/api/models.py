@@ -140,6 +140,7 @@ class Invoice(models.Model):
     PAYMENT_STATUS_CHOICES = [
         ("PENDING", "Pending"),
         ("UNPAID", "Unpaid"),
+        ("WAITER PAID","Waiter Paid"),
         ("PARTIAL", "Partially Paid"),
         ("PAID", "Fully Paid"),
         ("CANCELLED", "Cancelled"),
@@ -201,7 +202,7 @@ class Invoice(models.Model):
 
     # Status
     payment_status = models.CharField(
-        max_length=10, choices=PAYMENT_STATUS_CHOICES, default="PENDING"
+        max_length=15, choices=PAYMENT_STATUS_CHOICES, default="PENDING"
     )
     invoice_status = models.CharField(
         max_length=10, choices=INVOICE_STATUS_CHOICES, default="PENDING"

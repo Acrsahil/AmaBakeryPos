@@ -292,16 +292,19 @@ export default function Checkout() {
             return;
         }
 
-        if (receivedAmount < total) {
-            toast.error("Insufficient amount", {
-                description: `Need Rs.${(total - receivedAmount).toFixed(2)} more`,
-            });
-            return;
-        }
+        // if (receivedAmount < total) {
+        //     toast.error("Insufficient amount", {
+        //         description: `Need Rs.${(total - receivedAmount).toFixed(2)} more`,
+        //     });
+        //     return;
+        // }
 
         try {
-            await submitInvoice(true, total, "CASH");
-            const change = receivedAmount - total;
+            await submitInvoice(true, Math.min(total, receivedAmount), "CASH");
+            const change = 0;
+            if(receivedAmount>total){
+                const change = receivedAmount - total;
+            }
 
             toast.success("Payment Confirmed!", {
                 description: change > 0
