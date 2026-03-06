@@ -65,87 +65,9 @@ class StaffReportViewClass(APIView):
         staff_qs = User.objects.filter(
             branch=my_branch,
             is_active=True,
-            
-        ).exclude(user_type = ["KITCHEN","BRANCH_MANAGER"],is_superuser=True)
+        ).exclude(is_superuser=True)
 
         staff_data = []
-
-
-        # cnt = 0
-        # print(today)
-        #
-        # for staff in staff_qs:
-        #     fortoday = Invoice.objects.raw(
-        #         """
-        #         SELECT 
-        #             %s as id,
-        #             COUNT(*) as total_order,
-        #             COALESCE(SUM(I.total_amount),0) as total_sales,
-        #             %s as staff_name,
-        #             %s as user_type,
-        #             %s as staff_id_display
-        #         FROM api_invoice I
-        #         WHERE I.branch_id = %s 
-        #         AND DATE(I.created_at) = %s
-        #         AND (
-        #             I.received_by_waiter_id = %s OR 
-        #             I.received_by_counter_id = %s OR 
-        #             I.created_by_id = %s
-        #         )
-        #         """,
-        #         [staff.id, staff.full_name,staff.user_type, staff.id, my_branch.id, today, staff.id, staff.id, staff.id]
-        #     )
-        #
-        #     formonths = []
-        #     forday = []
-        #
-        #     for staff in fortoday:
-        #         forday.append({
-        #             "id": staff.id,
-        #             "name": staff.staff_name or staff.username,
-        #             "role": staff.user_type,
-        #             "total_orders": staff.total_order,
-        #             "total_sales": float(staff.total_sales),
-        #             # "total_cash_in_hand": float(total_cash_in_hand),
-        #             "current_month_orders": 0,
-        #             "current_month_sales": 0,
-        #             }
-        #                 )
-        #
-        #
-        #
-        #     forday[0]["current_month_orders"] = 25
-        #     print(forday)
-
-            #
-            #
-            # formonth = Invoice.objects.raw(
-            #     """
-            #     SELECT 
-            #         %s as id,
-            #         COUNT(*) as total_order,
-            #         COALESCE(SUM(I.total_amount),0) as total_sales,
-            #         %s as staff_name,
-            #         COALESCE(%s, 'no_username') as username,
-            #         %s as user_type,
-            #         %s as staff_id_display
-            #     FROM api_invoice I
-            #     WHERE I.branch_id = %s 
-            #     AND EXTRACT(MONTH FROM I.created_at) = %s
-            #     AND (
-            #         I.received_by_waiter_id = %s OR 
-            #         I.received_by_counter_id = %s OR 
-            #         I.created_by_id = %s
-            #     )
-            #     """,
-            #     [staff.id, staff.full_name,staff.username,staff.user_type, staff.id, my_branch.id, current_month, staff.id, staff.id, staff.id]
-            # )
-
-            
-            # for item in formonth:
-            #         print(f"Staff_Monthly {item.staff_name}: {item.total_order} orders, Sales_Monthly: Rs.{item.total_sales}")
-
-
 
         for staff in staff_qs:
             # Invoices where this staff member was the waiter OR counter OR creator

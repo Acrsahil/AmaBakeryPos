@@ -9,3 +9,4 @@ urlpatterns =[
     path('staff-report/',views.StaffReportView.as_view(),name="staff-report"),
     path('staff-report/<int:branch_id>/',views.StaffReportView.as_view(),name="staff-report-branch"),
 ]
+

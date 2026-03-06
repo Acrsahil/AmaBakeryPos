@@ -30,8 +30,12 @@ def get_date_range(request):
     # Support both DRF request (query_params) and standard Django request (GET)
     query_params = getattr(request, "query_params", request.GET)
     timeframe = query_params.get("timeframe", "weekly")
+
+    print("This is time frame-> ",timeframe)
     start_date_str = query_params.get("start_date")
+    print("This is time startdate-> ",start_date_str)
     end_date_str = query_params.get("end_date")
+    print("This is time enddate-> ",end_date_str)
 
     if start_date_str and end_date_str:
         try:
@@ -54,6 +58,7 @@ def get_date_range(request):
         start_of_week = today - timedelta(days=today.weekday())
         return start_of_week, today, "weekly"
     elif timeframe == "monthly":
+        
         start_of_month = today.replace(day=1)
         return start_of_month, today, "monthly"
     elif timeframe == "yearly":
